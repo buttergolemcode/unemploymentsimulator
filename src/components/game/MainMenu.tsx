@@ -27,12 +27,41 @@ export function MainMenu() {
           <div className="text-6xl md:text-7xl mb-2">💸</div>
           <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">
             UNEMPLOYMENT
-            <span className="block text-primary">SIMULATOR</span>
+            <span className="block text-primary">SIMULATOR 3D</span>
           </h1>
           <p className="mt-3 text-muted-foreground text-sm md:text-base max-w-xl mx-auto">
             You&apos;ve been laid off. The unemployment money is running out. Mom keeps
             asking when you&apos;re &ldquo;going to get a real job.&rdquo; Prove her wrong.
-            Make $1,000,000 in 60 days — without ever stepping foot in a McDonald&apos;s.
+            Walk around a 3D city, hustle 8 shady schemes, and make $1,000,000 in 60 days —
+            without ever stepping foot in a McDonald&apos;s.
+          </p>
+        </div>
+
+        {/* Controls hint */}
+        <div className="mt-4 rounded-lg border bg-muted/30 p-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+            Controls
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">WASD</kbd>
+              <span className="text-muted-foreground">Move</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">Click</kbd>
+              <span className="text-muted-foreground">Walk to point</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">E</kbd>
+              <span className="text-muted-foreground">Enter building</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">Esc</kbd>
+              <span className="text-muted-foreground">Exit building</span>
+            </div>
+          </div>
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Or use the Quick Travel buttons and Mini-Map in-game.
           </p>
         </div>
 

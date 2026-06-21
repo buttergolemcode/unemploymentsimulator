@@ -16,6 +16,16 @@ const MAX_ACTIONS = 3;
 const STARTING_MONEY = 500;
 const MAX_DAYS = 60; // soft cap — after this, McDonald's offer becomes inevitable
 
+// Module-level flag for "is the 3D action panel currently open?"
+// This avoids a circular import between the game store and the player store.
+let _actionPanelOpen = false;
+function isActionPanelOpen() {
+  return _actionPanelOpen;
+}
+export function setActionPanelOpen(open: boolean) {
+  _actionPanelOpen = open;
+}
+
 function makeInitialSkills(): Record<SkillId, { level: number; xp: number }> {
   const ids: SkillId[] = [
     'ecom',
@@ -217,12 +227,20 @@ export const useGame = create<GameStore>((set, get) => ({
     });
 
     // If actions ran out, auto-trigger end-of-day event roll after a tiny delay.
-    // We do this by scheduling via setTimeout-like check.
+    // The endDay function itself checks the action-panel flag, so it's safe.
     if (newActionsLeft <= 0 && phase === 'playing') {
       // Defer end-of-day event roll
       setTimeout(() => {
-        get().endDay();
-      }, 400);
+        // Wait a bit longer if the action panel is still open
+        const tryEnd = () => {
+          if (isActionPanelOpen()) {
+            setTimeout(tryEnd, 400);
+          } else {
+            get().endDay();
+          }
+        };
+        tryEnd();
+      }, 600);
     }
   },
 
@@ -230,6 +248,9 @@ export const useGame = create<GameStore>((set, get) => ({
     const state = get();
     if (state.phase !== 'playing') return;
     if (state.pendingEvent) return;
+    // Don't auto-advance if the player is inside a building action panel
+    // (we use a module-level flag set by the 3D UI to avoid a circular import)
+    if (isActionPanelOpen()) return;
 
     // Roll event first — if one fires, present it; otherwise advance day.
     const event = rollDailyEvent(state);
