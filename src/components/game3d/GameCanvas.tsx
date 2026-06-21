@@ -28,13 +28,20 @@ function GameTick() {
 // Keyboard handler: E to enter nearby building, WASD/arrows to move
 function KeyboardController() {
   const moveTo = usePlayer((s) => s.moveTo);
-  const nearbyBuildingId = usePlayer((s) => s.nearbyBuildingId);
-  const actionPanelOpen = usePlayer((s) => s.actionPanelOpen);
   const setActionPanel = usePlayer((s) => s.setActionPanel);
 
-  // Get current player position from store directly each keydown
+  // Use refs so we don't tear down/recreate the listeners every time nearbyBuildingId changes
+  const nearbyRef = useRef<SchemeId | null>(null);
+  const panelOpenRef = useRef<boolean>(false);
   const keys = useRef<Record<string, boolean>>({});
   const lastMoveUpdate = useRef<number>(0);
+
+  // Keep refs in sync with the store (subscribe via selectors)
+  usePlayer((s) => {
+    if (s.nearbyBuildingId !== nearbyRef.current) nearbyRef.current = s.nearbyBuildingId;
+    if (s.actionPanelOpen !== panelOpenRef.current) panelOpenRef.current = s.actionPanelOpen;
+    return s.nearbyBuildingId; // only re-subscribe on this value changing
+  });
 
   useEffect(() => {
     const handleDown = (e: KeyboardEvent) => {
@@ -43,13 +50,13 @@ function KeyboardController() {
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
       // E to enter building
-      if ((e.key === 'e' || e.key === 'E') && nearbyBuildingId && !actionPanelOpen) {
+      if ((e.key === 'e' || e.key === 'E') && nearbyRef.current && !panelOpenRef.current) {
         setActionPanel(true);
         e.preventDefault();
         return;
       }
       // Esc to close action panel
-      if (e.key === 'Escape' && actionPanelOpen) {
+      if (e.key === 'Escape' && panelOpenRef.current) {
         setActionPanel(false);
         return;
       }
@@ -66,7 +73,7 @@ function KeyboardController() {
     let raf: number;
     const moveLoop = () => {
       const now = performance.now();
-      if (now - lastMoveUpdate.current > 50 && !actionPanelOpen) {
+      if (now - lastMoveUpdate.current > 30 && !panelOpenRef.current) {
         const k = keys.current;
         let dx = 0;
         let dz = 0;
@@ -97,7 +104,7 @@ function KeyboardController() {
       window.removeEventListener('keyup', handleUp);
       cancelAnimationFrame(raf);
     };
-  }, [nearbyBuildingId, actionPanelOpen, moveTo, setActionPanel]);
+  }, [moveTo, setActionPanel]);
 
   return null;
 }
@@ -121,11 +128,20 @@ export function GameCanvas() {
   const phase = useGame((s) => s.phase);
 
   return (
-    <div className="absolute inset-0 w-full h-full">
+    <div
+      className="absolute inset-0 w-full h-full"
+      // Make sure clicks on the canvas area focus the window so WASD works immediately
+      onPointerDown={(e) => {
+        // Only refocus if the click was on the canvas itself
+        if (e.target instanceof HTMLCanvasElement) {
+          window.focus();
+        }
+      }}
+    >
       <Canvas
         shadows
         camera={{ position: [0, 14, 14], fov: 50, near: 0.1, far: 200 }}
-        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        gl={{ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
         onCreated={({ gl }) => {
           gl.setClearColor('#0a0e1a');
           gl.toneMapping = THREE.ACESFilmicToneMapping;

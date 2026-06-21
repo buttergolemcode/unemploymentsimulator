@@ -36,20 +36,24 @@ export default function Home() {
     }
   }, [phase, resetPosition]);
 
-  // Keyboard shortcut 'E' to open action panel (handled in GameCanvas KeyboardController),
-  // but we also listen here to keep panel state in sync.
+  // Show the controls hint for the first 8 seconds of each run.
+  // We use a `runStartedAt` timestamp + interval polling, which avoids
+  // calling setState inside an effect that depends on `phase`.
+  const [hintDismissedAt, setHintDismissedAt] = useState<number | null>(null);
+  const hintVisible =
+    phase === 'playing' &&
+    (hintDismissedAt === null || Date.now() - hintDismissedAt < 0);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'e' || e.key === 'E') {
-        if (nearbyBuildingId && phase === 'playing' && !pendingEvent && !actionPanelOpen) {
-          setActionPanel(true);
-          e.preventDefault();
-        }
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [nearbyBuildingId, phase, pendingEvent, actionPanelOpen, setActionPanel]);
+    if (phase !== 'playing') {
+      setHintDismissedAt(null);
+      return;
+    }
+    const t = setTimeout(() => setHintDismissedAt(Date.now()), 8000);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  // Keyboard shortcut 'E' is handled inside GameCanvas KeyboardController.
+  // The 'Enter Building' button below also handles click-to-open.
 
   if (phase === 'menu') {
     return <MainMenu />;
@@ -65,34 +69,36 @@ export default function Home() {
       <GameCanvas />
 
       {/* Top-left: title + actions */}
-      <div className="absolute top-2 left-2 right-2 md:top-4 md:left-4 md:right-auto z-10 flex items-center gap-2">
-        <div className="backdrop-blur-md bg-card/80 rounded-lg px-3 py-1.5 border">
+      <div className="absolute top-2 left-2 right-2 md:top-4 md:left-4 md:right-auto z-10 flex items-center gap-2 pointer-events-none">
+        <div className="backdrop-blur-md bg-card/80 rounded-lg px-3 py-1.5 border pointer-events-auto">
           <div className="text-xs md:text-sm font-bold leading-none flex items-center gap-1.5">
             <span className="text-base">💸</span>
             <span className="hidden sm:inline">Unemployment Sim</span>
             <span className="sm:hidden">3D</span>
           </div>
         </div>
-        <TopBar />
+        <div className="pointer-events-auto">
+          <TopBar />
+        </div>
       </div>
 
       {/* Top-right: mini-map (desktop) */}
-      <div className="absolute top-2 right-2 md:top-4 md:right-4 z-10 hidden md:block">
+      <div className="absolute top-2 right-2 md:top-4 md:right-4 z-10 hidden md:block pointer-events-auto">
         <MiniMap />
       </div>
 
       {/* Below stats bar (top-left, full width) */}
-      <div className="absolute top-14 md:top-20 left-2 right-2 md:left-4 md:right-auto md:max-w-md z-10">
+      <div className="absolute top-14 md:top-20 left-2 right-2 md:left-4 md:right-auto md:max-w-md z-10 pointer-events-none">
         <HUDStatsBar />
       </div>
 
       {/* Bottom-left: Quick travel */}
-      <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4 z-10 max-w-xs">
+      <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4 z-10 max-w-xs pointer-events-auto">
         <QuickTravel />
       </div>
 
       {/* Bottom-right: log toggle + log panel */}
-      <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 z-10 flex flex-col items-end gap-2 max-w-sm">
+      <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 z-10 flex flex-col items-end gap-2 max-w-sm pointer-events-auto">
         {logOpen ? (
           <div className="w-[280px] md:w-[360px]">
             <div className="flex items-center justify-between mb-1">
@@ -127,7 +133,7 @@ export default function Home() {
 
       {/* Bottom-center: interaction prompt */}
       {nearbyBuildingId && !actionPanelOpen && !pendingEvent && (
-        <div className="absolute bottom-24 md:bottom-28 left-1/2 -translate-x-1/2 z-10">
+        <div className="absolute bottom-24 md:bottom-28 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
           <Button
             size="lg"
             onClick={() => setActionPanel(true)}
@@ -140,8 +146,23 @@ export default function Home() {
 
       {/* Mobile-only: bottom-center hint */}
       <div className="absolute bottom-1 left-1/2 -translate-x-1/2 md:hidden text-[10px] text-white/50 z-0 pointer-events-none">
-        Tap ground to walk · drag to look
+        Tap ground to walk
       </div>
+
+      {/* First-run controls hint (auto-dismisses after 8s) */}
+      {hintVisible && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none animate-in fade-in duration-500">
+          <div className="bg-black/80 backdrop-blur-md border border-white/20 rounded-xl px-5 py-4 text-center shadow-2xl">
+            <div className="text-sm font-bold text-white mb-2">🎮 Controls</div>
+            <div className="text-xs text-white/90 space-y-1">
+              <div><kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">WASD</kbd> or <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Arrows</kbd> — walk</div>
+              <div><kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Click ground</kbd> — walk to point</div>
+              <div><kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">E</kbd> — enter nearby building</div>
+              <div className="text-white/60 mt-1.5 text-[10px]">Or tap a dot on the mini-map to auto-walk</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Building action panel (overlay) */}
       {actionPanelOpen && nearbyBuildingId && (
