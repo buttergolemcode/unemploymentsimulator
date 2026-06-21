@@ -4,17 +4,16 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  DollarSign, Flame, Calendar, Star, Zap, Bed, Bug, ChevronRight,
+  DollarSign, Flame, Calendar, Star, Zap, Bed, Bug,
   Clock, Eye, Video, MousePointerClick,
 } from 'lucide-react';
-import { useGame, WIN_AMOUNT, MAX_ACTIONS, MAX_DAYS, schemes } from '@/lib/game/store';
+import { useGame, WIN_AMOUNT, MAX_ACTIONS, MAX_DAYS } from '@/lib/game/store';
 import { formatMoney } from '@/lib/game/format';
 import { useMemo, useEffect, useState } from 'react';
 import { usePlayer } from './playerStore';
 import { walkToBuilding } from './GameCanvas';
 import { BUILDINGS } from './layout';
 import { getTimeOfDay, getDayPhase, formatClock } from './dayNight';
-import type { SchemeId } from '@/lib/game/types';
 
 export function HUDStatsBar() {
   const money = useGame((s) => s.money);
@@ -220,63 +219,6 @@ export function MiniMap() {
       </div>
       <div className="mt-1 text-[9px] text-muted-foreground">
         Click a dot to fast-travel
-      </div>
-    </Card>
-  );
-}
-
-// Quick-buildings list (mobile-friendly alternative to walking)
-export function QuickTravel() {
-  const nearbyId = usePlayer((s) => s.nearbyBuildingId);
-  const setActionPanel = usePlayer((s) => s.setActionPanel);
-  const actionPanelOpen = usePlayer((s) => s.actionPanelOpen);
-  const actionsLeft = useGame((s) => s.actionsLeft);
-  const pendingEvent = useGame((s) => s.pendingEvent);
-  const phase = useGame((s) => s.phase);
-
-  const handleBuildingClick = (id: SchemeId) => {
-    if (phase !== 'playing' || pendingEvent) return;
-    if (nearbyId === id) {
-      // Already here — open the panel
-      setActionPanel(true);
-    } else {
-      // Walk there
-      walkToBuilding(id);
-    }
-  };
-
-  return (
-    <Card className="p-2 backdrop-blur-md bg-card/90">
-      <div className="text-[9px] uppercase tracking-wide text-muted-foreground mb-1">
-        Quick Travel
-      </div>
-      <div className="grid grid-cols-4 gap-1">
-        {schemes.map((s) => {
-          const isNear = nearbyId === s.id;
-          return (
-            <button
-              key={s.id}
-              onClick={() => handleBuildingClick(s.id)}
-              disabled={phase !== 'playing' || !!pendingEvent || actionPanelOpen || actionsLeft <= 0}
-              className={`flex flex-col items-center rounded-md border p-1 text-[10px] transition-colors disabled:opacity-50 ${
-                isNear
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border hover:border-primary/40'
-              }`}
-              title={s.name}
-            >
-              <span className="text-base leading-none">{s.emoji}</span>
-              <span className="mt-0.5 leading-none truncate w-full text-center">
-                {s.name.split(' ')[0]}
-              </span>
-              {isNear && (
-                <span className="text-[8px] text-primary font-semibold leading-none mt-0.5 flex items-center">
-                  Enter <ChevronRight className="h-2 w-2" />
-                </span>
-              )}
-            </button>
-          );
-        })}
       </div>
     </Card>
   );

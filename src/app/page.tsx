@@ -12,7 +12,6 @@ import { useEffect, useState } from 'react';
 import {
   HUDStatsBar,
   MiniMap,
-  QuickTravel,
   TopBar,
   CameraToggle,
   Crosshair,
@@ -100,11 +99,6 @@ export default function Home() {
         <HUDStatsBar />
       </div>
 
-      {/* Bottom-left: Quick travel */}
-      <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4 z-10 max-w-xs pointer-events-auto">
-        <QuickTravel />
-      </div>
-
       {/* Bottom-right: log toggle + log panel */}
       <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 z-10 flex flex-col items-end gap-2 max-w-sm pointer-events-auto">
         {logOpen ? (
@@ -182,7 +176,7 @@ export default function Home() {
                 — toggle 1st/3rd person
               </div>
               <div className="text-white/60 mt-2 text-[10px] pt-2 border-t border-white/10">
-                Or tap a dot on the mini-map to fast-travel
+                In 3rd person: right-click + drag to rotate camera
               </div>
             </div>
           </div>

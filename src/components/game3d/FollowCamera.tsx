@@ -88,6 +88,7 @@ export function FollowCamera() {
 }
 
 // Separate component to register pointer-lock event listeners (so they're not re-registered every frame).
+// Also handles third-person drag-look (hold right mouse button + move mouse to rotate camera).
 import { useEffect } from 'react';
 export function PointerLockController() {
   const { gl } = useThree();
@@ -112,19 +113,32 @@ export function PointerLockController() {
     };
     const onMouseMove = (e: MouseEvent) => {
       const s = usePlayer.getState();
+      // First-person: pointer-locked mouse-look (yaw + pitch)
       if (s.pointerLocked && s.cameraMode === 'first') {
         s.applyMouseDelta(e.movementX, e.movementY);
+        return;
       }
+      // Third-person: right-button-drag to look around (yaw only, no pitch in 3rd person)
+      if (s.cameraMode === 'third' && (e.buttons & 2) !== 0) {
+        // Apply only horizontal mouse delta to yaw (positive movementX = look right)
+        s.applyMouseDelta(e.movementX, 0);
+      }
+    };
+    // Prevent context menu so right-click can be used for camera drag
+    const onContextMenu = (e: MouseEvent) => {
+      const s = usePlayer.getState();
+      if (s.cameraMode === 'third') e.preventDefault();
     };
 
     canvas.addEventListener('click', onClick);
+    canvas.addEventListener('contextmenu', onContextMenu);
     document.addEventListener('pointerlockchange', onPointerLockChange);
     document.addEventListener('mousemove', onMouseMove);
     return () => {
       canvas.removeEventListener('click', onClick);
+      canvas.removeEventListener('contextmenu', onContextMenu);
       document.removeEventListener('pointerlockchange', onPointerLockChange);
       document.removeEventListener('mousemove', onMouseMove);
-      // Release pointer lock on unmount
       if (document.pointerLockElement === canvas) {
         document.exitPointerLock?.();
       }

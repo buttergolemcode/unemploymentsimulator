@@ -69,7 +69,7 @@ export function MainMenu() {
             </div>
           </div>
           <p className="mt-2 text-[10px] text-muted-foreground">
-            Or use the Mini-Map dots in-game to fast-travel to any scheme building.
+            In 3rd person: right-click + drag to rotate camera. Walk to buildings to enter them.
           </p>
         </div>
 

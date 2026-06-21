@@ -26,51 +26,56 @@ function GameTick() {
 }
 
 // Keyboard handler: E to enter nearby building, WASD/arrows to move, V to toggle camera
+// Both first-person AND third-person use the SAME yaw-relative movement logic.
+// This eliminates the "inverted / random WASD" bug when switching camera modes.
 function KeyboardController() {
-  const moveTo = usePlayer((s) => s.moveTo);
   const setActionPanel = usePlayer((s) => s.setActionPanel);
   const toggleCamera = usePlayer((s) => s.toggleCamera);
   const setFpsInput = usePlayer((s) => s.setFpsInput);
 
-  // Use refs so we don't tear down/recreate the listeners every time nearbyBuildingId changes
+  // Refs that mirror frequently-changing store values without causing effect re-runs
   const nearbyRef = useRef<SchemeId | null>(null);
   const panelOpenRef = useRef<boolean>(false);
   const cameraModeRef = useRef<'first' | 'third'>('first');
   const keys = useRef<Record<string, boolean>>({});
 
-  // Keep refs in sync with the store (subscribe via selectors)
+  // Keep refs in sync with the store (subscribe via selector that returns cameraMode so we re-run on changes)
   usePlayer((s) => {
-    if (s.nearbyBuildingId !== nearbyRef.current) nearbyRef.current = s.nearbyBuildingId;
-    if (s.actionPanelOpen !== panelOpenRef.current) panelOpenRef.current = s.actionPanelOpen;
-    if (s.cameraMode !== cameraModeRef.current) cameraModeRef.current = s.cameraMode;
-    return s.nearbyBuildingId;
+    nearbyRef.current = s.nearbyBuildingId;
+    panelOpenRef.current = s.actionPanelOpen;
+    cameraModeRef.current = s.cameraMode;
+    return s.cameraMode;
   });
 
-  useEffect(() => {
-    const computeInput = () => {
-      const k = keys.current;
-      let forward = 0;
-      let right = 0;
-      if (k['w'] || k['arrowup']) forward += 1;
-      if (k['s'] || k['arrowdown']) forward -= 1;
-      if (k['a'] || k['arrowleft']) right -= 1;
-      if (k['d'] || k['arrowright']) right += 1;
-      // Clamp magnitude
-      const len = Math.sqrt(forward * forward + right * right);
-      if (len > 1) {
-        forward /= len;
-        right /= len;
-      }
-      return { forward, right };
-    };
+  // Helper: compute normalized {forward, right} input from currently-pressed keys.
+  // W/Up = forward (+1), S/Down = backward (-1), A/Left = left (-1), D/Right = right (+1).
+  const computeInput = () => {
+    const k = keys.current;
+    let forward = 0;
+    let right = 0;
+    if (k['w'] || k['arrowup']) forward += 1;
+    if (k['s'] || k['arrowdown']) forward -= 1;
+    if (k['a'] || k['arrowleft']) right -= 1;
+    if (k['d'] || k['arrowright']) right += 1;
+    // Clamp magnitude so diagonal isn't faster
+    const len = Math.sqrt(forward * forward + right * right);
+    if (len > 1) {
+      forward /= len;
+      right /= len;
+    }
+    return { forward, right };
+  };
 
+  useEffect(() => {
     const handleDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
-      // V toggles camera mode
+      // V toggles camera mode — and we re-sync the input so movement continues smoothly
       if (e.key === 'v' || e.key === 'V') {
         toggleCamera();
+        // After toggle, recompute FPS input so movement keeps flowing in the new mode
+        setTimeout(() => setFpsInput(computeInput()), 0);
         e.preventDefault();
         return;
       }
@@ -87,68 +92,28 @@ function KeyboardController() {
       }
 
       keys.current[e.key.toLowerCase()] = true;
-
-      // In first-person, immediately update FPS input
-      if (cameraModeRef.current === 'first') {
-        setFpsInput(computeInput());
-      }
+      // Always update FPS input (used by BOTH camera modes for movement)
+      setFpsInput(computeInput());
     };
     const handleUp = (e: KeyboardEvent) => {
       keys.current[e.key.toLowerCase()] = false;
-      if (cameraModeRef.current === 'first') {
-        // Recompute input on key release
-        const k = keys.current;
-        let forward = 0;
-        let right = 0;
-        if (k['w'] || k['arrowup']) forward += 1;
-        if (k['s'] || k['arrowdown']) forward -= 1;
-        if (k['a'] || k['arrowleft']) right -= 1;
-        if (k['d'] || k['arrowright']) right += 1;
-        setFpsInput({ forward, right });
-      }
+      setFpsInput(computeInput());
+    };
+    const handleBlur = () => {
+      // Clear all keys when window loses focus (prevents "stuck key" bugs)
+      keys.current = {};
+      setFpsInput({ forward: 0, right: 0 });
     };
     window.addEventListener('keydown', handleDown);
     window.addEventListener('keyup', handleUp);
-
-    // Third-person click-to-move loop (rAF)
-    let raf: number;
-    let lastMoveUpdate = 0;
-    const moveLoop = () => {
-      const now = performance.now();
-      if (
-        cameraModeRef.current === 'third' &&
-        now - lastMoveUpdate > 30 &&
-        !panelOpenRef.current
-      ) {
-        const k = keys.current;
-        let dx = 0;
-        let dz = 0;
-        if (k['w'] || k['arrowup']) dz -= 1;
-        if (k['s'] || k['arrowdown']) dz += 1;
-        if (k['a'] || k['arrowleft']) dx -= 1;
-        if (k['d'] || k['arrowright']) dx += 1;
-        if (dx !== 0 || dz !== 0) {
-          const s = usePlayer.getState();
-          const len = Math.sqrt(dx * dx + dz * dz);
-          const nx = s.x + (dx / len) * 1.2;
-          const nz = s.z + (dz / len) * 1.2;
-          const r = Math.sqrt(nx * nx + nz * nz);
-          if (r <= 60) {
-            moveTo(nx, nz);
-          }
-          lastMoveUpdate = now;
-        }
-      }
-      raf = requestAnimationFrame(moveLoop);
-    };
-    raf = requestAnimationFrame(moveLoop);
+    window.addEventListener('blur', handleBlur);
 
     return () => {
       window.removeEventListener('keydown', handleDown);
       window.removeEventListener('keyup', handleUp);
-      cancelAnimationFrame(raf);
+      window.removeEventListener('blur', handleBlur);
     };
-  }, [moveTo, setActionPanel, toggleCamera, setFpsInput]);
+  }, [setActionPanel, toggleCamera, setFpsInput]);
 
   return null;
 }

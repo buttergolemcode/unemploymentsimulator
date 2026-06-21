@@ -115,25 +115,26 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
     const s = get();
     if (s.actionPanelOpen) return false;
 
-    // --- First-person movement (WASD relative to yaw) ---
-    if (s.cameraMode === 'first' && s.fpsMoving) {
+    // --- WASD movement (yaw-relative) — used for BOTH first-person and third-person ---
+    // This is the only movement mode now. Third-person camera follows the player from behind.
+    if (s.fpsMoving) {
       const { forward, right } = s.fpsInput;
-      // Forward vector based on yaw (yaw=0 means looking -Z, so forward = (-sin(yaw), 0, -cos(yaw)))
+      // Forward vector based on yaw (yaw=0 → looking -Z, so forward = (-sin(yaw), 0, -cos(yaw)))
       const fx = -Math.sin(s.yaw);
       const fz = -Math.cos(s.yaw);
-      // Right vector (perpendicular, 90° clockwise)
+      // Right vector (perpendicular, 90° clockwise from forward)
       const rx = Math.cos(s.yaw);
       const rz = -Math.sin(s.yaw);
 
-      let dx = fx * forward + rx * right;
-      let dz = fz * forward + rz * right;
+      const dx = fx * forward + rx * right;
+      const dz = fz * forward + rz * right;
       const len = Math.sqrt(dx * dx + dz * dz);
       if (len > 0) {
-        dx /= len;
-        dz /= len;
+        const ndx = dx / len;
+        const ndz = dz / len;
         const step = FPS_SPEED * dt;
-        const nx = s.x + dx * step;
-        const nz = s.z + dz * step;
+        const nx = s.x + ndx * step;
+        const nz = s.z + ndz * step;
         // Clamp to world bounds (circle)
         const r = Math.sqrt(nx * nx + nz * nz);
         if (r <= WORLD_MAX) {
@@ -146,31 +147,35 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
       return false;
     }
 
-    // --- Third-person click-to-move ---
-    if (!s.walking) {
-      const near = nearestBuilding(s.x, s.z);
-      const newId = near && near.distance < INTERACT_DISTANCE ? near.building.id : null;
-      if (newId !== s.nearbyBuildingId) {
-        set({ nearbyBuildingId: newId });
+    // --- Click-to-move (only used in third-person when player clicks the ground) ---
+    if (s.walking) {
+      const dx = s.targetX - s.x;
+      const dz = s.targetZ - s.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < 0.05) {
+        const near = nearestBuilding(s.x, s.z);
+        const newId = near && near.distance < INTERACT_DISTANCE ? near.building.id : null;
+        set({ walking: false, nearbyBuildingId: newId });
+        return false;
       }
-      return false;
-    }
-    const dx = s.targetX - s.x;
-    const dz = s.targetZ - s.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
-    if (dist < 0.05) {
-      const near = nearestBuilding(s.x, s.z);
+      const step = Math.min(dist, SPEED * dt);
+      const nx = s.x + (dx / dist) * step;
+      const nz = s.z + (dz / dist) * step;
+      const near = nearestBuilding(nx, nz);
       const newId = near && near.distance < INTERACT_DISTANCE ? near.building.id : null;
-      set({ walking: false, nearbyBuildingId: newId });
-      return false;
+      // Make the player face the walk direction in third-person mode
+      const newYaw = Math.atan2(dx, dz);
+      set({ x: nx, z: nz, nearbyBuildingId: newId, yaw: newYaw });
+      return true;
     }
-    const step = Math.min(dist, SPEED * dt);
-    const nx = s.x + (dx / dist) * step;
-    const nz = s.z + (dz / dist) * step;
-    const near = nearestBuilding(nx, nz);
+
+    // Idle — still update nearby-building state
+    const near = nearestBuilding(s.x, s.z);
     const newId = near && near.distance < INTERACT_DISTANCE ? near.building.id : null;
-    set({ x: nx, z: nz, nearbyBuildingId: newId });
-    return true;
+    if (newId !== s.nearbyBuildingId) {
+      set({ nearbyBuildingId: newId });
+    }
+    return false;
   },
 
   resetPosition: () => {
