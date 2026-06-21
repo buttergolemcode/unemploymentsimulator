@@ -4,9 +4,11 @@ import { useRef, useMemo } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { Text, RoundedBox, Cylinder } from '@react-three/drei';
 import * as THREE from 'three';
-import { BUILDINGS, INTERACT_DISTANCE, FILLER_BUILDINGS, STREETS } from './layout';
+import { BUILDINGS, INTERACT_DISTANCE, FILLER_BUILDINGS, STREETS, DISTRICTS, districtAt } from './layout';
 import { usePlayer } from './playerStore';
 import { DayNightLighting } from './FollowCamera';
+import { NPCLayer } from './NPCs';
+import { Weather } from './Weather';
 import type { BuildingPos, FillerBuilding, StreetSegment } from './layout';
 import type { SchemeId } from '../../lib/game/types';
 
@@ -347,7 +349,13 @@ function FillerBuildingMesh({ b }: { b: FillerBuilding }) {
 
       {/* Windows — emissive grid, only if building has them */}
       {b.hasWindows && (
-        <BuildingWindows width={b.width} height={b.height} depth={b.depth} />
+        <BuildingWindows
+          width={b.width}
+          height={b.height}
+          depth={b.depth}
+          litChance={b.windowLitChance}
+          seed={Math.abs(b.x * 13 + b.z * 7)}
+        />
       )}
     </group>
   );
@@ -358,19 +366,23 @@ function BuildingWindows({
   width,
   height,
   depth,
+  litChance = 0.4,
+  seed = 1,
 }: {
   width: number;
   height: number;
   depth: number;
+  litChance?: number;
+  seed?: number;
 }) {
   const rows = Math.max(1, Math.floor(height / 1.8));
   const cols = Math.max(1, Math.floor(width / 1.2));
   const windows = [];
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      // Pseudo-random lit/unlit pattern
-      const seed = (row * 31 + col * 17) % 7;
-      const lit = seed < 3;
+      // Pseudo-random based on seed + row/col
+      const r = ((seed + row * 31 + col * 17) % 100) / 100;
+      const lit = r < litChance;
       const wx = (col - (cols - 1) / 2) * 1.2;
       const wy = 1.2 + row * 1.8;
       // Front face
@@ -460,6 +472,9 @@ export function GameScene() {
         </group>
       ))}
 
+      {/* District-specific ground tints (subtle colored planes inside each district) */}
+      <DistrictGroundTints />
+
       {/* Scheme buildings (interactive) */}
       {BUILDINGS.map((b) => (
         <Building key={b.id} b={b} />
@@ -479,6 +494,21 @@ export function GameScene() {
       <StreetLamp x={20} z={-20} />
       <StreetLamp x={-20} z={20} />
       <StreetLamp x={20} z={20} />
+      {/* Extra lamps per district for atmosphere */}
+      <StreetLamp x={-30} z={-40} />
+      <StreetLamp x={-45} z={-15} />
+      <StreetLamp x={30} z={-40} />
+      <StreetLamp x={45} z={-15} />
+      <StreetLamp x={-30} z={40} />
+      <StreetLamp x={-45} z={15} />
+      <StreetLamp x={30} z={40} />
+      <StreetLamp x={45} z={15} />
+
+      {/* NPCs — pedestrians + merchants */}
+      <NPCLayer />
+
+      {/* Weather (rain + fog) */}
+      <Weather />
 
       {/* Player avatar — visible only in third-person mode */}
       {cameraMode === 'third' && <PlayerAvatar />}
@@ -489,6 +519,32 @@ export function GameScene() {
   );
 }
 
+// Subtle district ground tints — colored planes overlaid on the base ground
+// so each district has its own ground tone.
+function DistrictGroundTints() {
+  return (
+    <>
+      {Object.values(DISTRICTS).map((d) => (
+        <mesh
+          key={d.id}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[(d.minX + d.maxX) / 2, 0.015, (d.minZ + d.maxZ) / 2]}
+          receiveShadow
+        >
+          <planeGeometry args={[d.maxX - d.minX, d.maxZ - d.minZ]} />
+          <meshStandardMaterial
+            color={d.groundColor}
+            roughness={1}
+            metalness={0}
+            transparent
+            opacity={0.55}
+          />
+        </mesh>
+      ))}
+    </>
+  );
+}
+
 // Re-export for use elsewhere
-export { BUILDINGS, INTERACT_DISTANCE };
+export { BUILDINGS, INTERACT_DISTANCE, districtAt };
 export type { BuildingPos };

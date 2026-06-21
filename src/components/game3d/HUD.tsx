@@ -5,14 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DollarSign, Flame, Calendar, Star, Zap, Bed, Bug,
-  Clock, Eye, Video, MousePointerClick,
+  Clock, Eye, Video, MousePointerClick, MapPin,
 } from 'lucide-react';
 import { useGame, WIN_AMOUNT, MAX_ACTIONS, MAX_DAYS } from '@/lib/game/store';
 import { formatMoney } from '@/lib/game/format';
 import { useMemo, useEffect, useState } from 'react';
 import { usePlayer } from './playerStore';
 import { walkToBuilding } from './GameCanvas';
-import { BUILDINGS } from './layout';
+import { BUILDINGS, districtAt, DISTRICTS } from './layout';
 import { getTimeOfDay, getDayPhase, formatClock } from './dayNight';
 
 export function HUDStatsBar() {
@@ -127,6 +127,21 @@ export function HUDStatsBar() {
   );
 }
 
+// District badge — shows which district the player is currently in
+export function DistrictBadge() {
+  const px = usePlayer((s) => s.x);
+  const pz = usePlayer((s) => s.z);
+  const d = districtAt(px, pz);
+  return (
+    <div className="backdrop-blur-md bg-card/80 rounded-lg px-3 py-1.5 border flex items-center gap-1.5">
+      <MapPin className="h-3.5 w-3.5 text-primary" />
+      <span className="text-xs md:text-sm font-semibold leading-none">
+        {d.emoji} {d.name}
+      </span>
+    </div>
+  );
+}
+
 // Camera mode toggle (first/third person)
 export function CameraToggle() {
   const cameraMode = usePlayer((s) => s.cameraMode);
@@ -174,13 +189,25 @@ export function MiniMap() {
   const pz = usePlayer((s) => s.z);
   const nearbyId = usePlayer((s) => s.nearbyBuildingId);
 
-  // Map world coords (-65..65) to map coords (0..100)
-  const toMap = (n: number) => ((n + 65) / 130) * 100;
+  // Map world coords (-60..60) to map coords (0..100)
+  const toMap = (n: number) => ((n + 60) / 120) * 100;
 
   return (
     <Card className="p-2 backdrop-blur-md bg-card/90 w-[140px] md:w-[180px]">
       <div className="text-[9px] uppercase tracking-wide text-muted-foreground mb-1">City Map</div>
       <div className="relative w-full aspect-square rounded-md bg-slate-950 border border-border overflow-hidden">
+        {/* District quadrant tints */}
+        <div className="absolute inset-0 grid grid-cols-2 grid-rows-2">
+          <div className="bg-blue-950/40" title="Downtown" />
+          <div className="bg-cyan-950/40" title="Harbor" />
+          <div className="bg-orange-950/40" title="Slums" />
+          <div className="bg-zinc-900/40" title="Industrial" />
+        </div>
+        {/* District labels */}
+        <div className="absolute top-1 left-1 text-[7px] text-blue-300 font-semibold">DT</div>
+        <div className="absolute top-1 right-1 text-[7px] text-cyan-300 font-semibold">HB</div>
+        <div className="absolute bottom-1 left-1 text-[7px] text-orange-300 font-semibold">SL</div>
+        <div className="absolute bottom-1 right-1 text-[7px] text-zinc-400 font-semibold">IN</div>
         {/* Buildings */}
         {BUILDINGS.map((b) => {
           const isNear = nearbyId === b.id;
@@ -218,7 +245,7 @@ export function MiniMap() {
         />
       </div>
       <div className="mt-1 text-[9px] text-muted-foreground">
-        Click a dot to fast-travel
+        Walk to a building and press E to enter
       </div>
     </Card>
   );

@@ -15,6 +15,7 @@ import {
   TopBar,
   CameraToggle,
   Crosshair,
+  DistrictBadge,
 } from '@/components/game3d/HUD';
 import { Button } from '@/components/ui/button';
 import { ScrollText as LogIcon, X } from 'lucide-react';
@@ -83,6 +84,9 @@ export default function Home() {
         </div>
         <div className="pointer-events-auto">
           <CameraToggle />
+        </div>
+        <div className="pointer-events-auto hidden md:block">
+          <DistrictBadge />
         </div>
       </div>
 
