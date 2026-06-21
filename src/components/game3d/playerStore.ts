@@ -1,8 +1,66 @@
 // Player movement store — separate from game logic state
 import { create } from 'zustand';
-import { PLAYER_SPAWN, INTERACT_DISTANCE, nearestBuilding } from './layout';
+import { PLAYER_SPAWN, INTERACT_DISTANCE, nearestBuilding, BUILDINGS, FILLER_BUILDINGS } from './layout';
 import type { SchemeId } from '../../lib/game/types';
 import { setActionPanelOpen } from '../../lib/game/store';
+
+// Pre-compute building AABBs once for collision (expanded by player radius).
+// Each entry: { minX, maxX, minZ, maxZ }
+const PLAYER_RADIUS = 0.5;
+
+interface AABB {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+const COLLIDER_AABBS: AABB[] = [
+  // Scheme buildings (use full width/depth, expanded by player radius)
+  ...BUILDINGS.map((b) => ({
+    minX: b.x - b.width / 2 - PLAYER_RADIUS,
+    maxX: b.x + b.width / 2 + PLAYER_RADIUS,
+    minZ: b.z - b.depth / 2 - PLAYER_RADIUS,
+    maxZ: b.z + b.depth / 2 + PLAYER_RADIUS,
+  })),
+  // Filler buildings (only the close ones matter; we include all of them — 80 is cheap to test)
+  ...FILLER_BUILDINGS.map((b) => ({
+    minX: b.x - b.width / 2 - PLAYER_RADIUS,
+    maxX: b.x + b.width / 2 + PLAYER_RADIUS,
+    minZ: b.z - b.depth / 2 - PLAYER_RADIUS,
+    maxZ: b.z + b.depth / 2 + PLAYER_RADIUS,
+  })),
+];
+
+// Check if a point (x, z) is inside any building AABB.
+function isBlocked(x: number, z: number): boolean {
+  for (const a of COLLIDER_AABBS) {
+    if (x > a.minX && x < a.maxX && z > a.minZ && z < a.maxZ) return true;
+  }
+  return false;
+}
+
+// Move from (x, z) by (dx, dz), but stop at building walls.
+// Resolves axis-separately so the player can slide along a wall instead of getting stuck.
+function moveWithCollision(x: number, z: number, dx: number, dz: number): { x: number; z: number } {
+  let nx = x;
+  let nz = z;
+  // Try X movement first
+  if (dx !== 0) {
+    const testX = x + dx;
+    if (!isBlocked(testX, z)) {
+      nx = testX;
+    }
+  }
+  // Then Z movement (using the already-updated X so we slide correctly)
+  if (dz !== 0) {
+    const testZ = z + dz;
+    if (!isBlocked(nx, testZ)) {
+      nz = testZ;
+    }
+  }
+  return { x: nx, z: nz };
+}
 
 export type CameraMode = 'first' | 'third';
 
@@ -116,7 +174,6 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
     if (s.actionPanelOpen) return false;
 
     // --- WASD movement (yaw-relative) — used for BOTH first-person and third-person ---
-    // This is the only movement mode now. Third-person camera follows the player from behind.
     if (s.fpsMoving) {
       const { forward, right } = s.fpsInput;
       // Forward vector based on yaw (yaw=0 → looking -Z, so forward = (-sin(yaw), 0, -cos(yaw)))
@@ -133,14 +190,14 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
         const ndx = dx / len;
         const ndz = dz / len;
         const step = FPS_SPEED * dt;
-        const nx = s.x + ndx * step;
-        const nz = s.z + ndz * step;
+        // Apply collision: try to move, sliding along walls if blocked
+        const result = moveWithCollision(s.x, s.z, ndx * step, ndz * step);
         // Clamp to world bounds (circle)
-        const r = Math.sqrt(nx * nx + nz * nz);
+        const r = Math.sqrt(result.x * result.x + result.z * result.z);
         if (r <= WORLD_MAX) {
-          const near = nearestBuilding(nx, nz);
+          const near = nearestBuilding(result.x, result.z);
           const newId = near && near.distance < INTERACT_DISTANCE ? near.building.id : null;
-          set({ x: nx, z: nz, nearbyBuildingId: newId });
+          set({ x: result.x, z: result.z, nearbyBuildingId: newId });
           return true;
         }
       }
@@ -159,13 +216,19 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
         return false;
       }
       const step = Math.min(dist, SPEED * dt);
-      const nx = s.x + (dx / dist) * step;
-      const nz = s.z + (dz / dist) * step;
-      const near = nearestBuilding(nx, nz);
+      const ndx = (dx / dist) * step;
+      const ndz = (dz / dist) * step;
+      const result = moveWithCollision(s.x, s.z, ndx, ndz);
+      const near = nearestBuilding(result.x, result.z);
       const newId = near && near.distance < INTERACT_DISTANCE ? near.building.id : null;
       // Make the player face the walk direction in third-person mode
       const newYaw = Math.atan2(dx, dz);
-      set({ x: nx, z: nz, nearbyBuildingId: newId, yaw: newYaw });
+      set({ x: result.x, z: result.z, nearbyBuildingId: newId, yaw: newYaw });
+      // If we didn't actually move (collision), stop walking to avoid jittering into a wall
+      const moved = Math.abs(result.x - s.x) > 0.001 || Math.abs(result.z - s.z) > 0.001;
+      if (!moved) {
+        set({ walking: false });
+      }
       return true;
     }
 
