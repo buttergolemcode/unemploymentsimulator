@@ -14,6 +14,8 @@ import {
   MiniMap,
   QuickTravel,
   TopBar,
+  CameraToggle,
+  Crosshair,
 } from '@/components/game3d/HUD';
 import { Button } from '@/components/ui/button';
 import { ScrollText as LogIcon, X } from 'lucide-react';
@@ -48,7 +50,7 @@ export default function Home() {
       setHintDismissedAt(null);
       return;
     }
-    const t = setTimeout(() => setHintDismissedAt(Date.now()), 8000);
+    const t = setTimeout(() => setHintDismissedAt(Date.now()), 10000);
     return () => clearTimeout(t);
   }, [phase]);
 
@@ -80,7 +82,13 @@ export default function Home() {
         <div className="pointer-events-auto">
           <TopBar />
         </div>
+        <div className="pointer-events-auto">
+          <CameraToggle />
+        </div>
       </div>
+
+      {/* Crosshair (first-person only) */}
+      <Crosshair />
 
       {/* Top-right: mini-map (desktop) */}
       <div className="absolute top-2 right-2 md:top-4 md:right-4 z-10 hidden md:block pointer-events-auto">
@@ -149,16 +157,33 @@ export default function Home() {
         Tap ground to walk
       </div>
 
-      {/* First-run controls hint (auto-dismisses after 8s) */}
+      {/* First-run controls hint (auto-dismisses after 10s) */}
       {hintVisible && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none animate-in fade-in duration-500">
-          <div className="bg-black/80 backdrop-blur-md border border-white/20 rounded-xl px-5 py-4 text-center shadow-2xl">
-            <div className="text-sm font-bold text-white mb-2">🎮 Controls</div>
-            <div className="text-xs text-white/90 space-y-1">
-              <div><kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">WASD</kbd> or <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Arrows</kbd> — walk</div>
-              <div><kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Click ground</kbd> — walk to point</div>
-              <div><kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">E</kbd> — enter nearby building</div>
-              <div className="text-white/60 mt-1.5 text-[10px]">Or tap a dot on the mini-map to auto-walk</div>
+          <div className="bg-black/85 backdrop-blur-md border border-white/20 rounded-xl px-6 py-5 text-center shadow-2xl max-w-md">
+            <div className="text-base font-bold text-white mb-3">🎮 Controls (First-Person)</div>
+            <div className="text-xs text-white/90 space-y-1.5">
+              <div>
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">WASD</kbd>{' '}
+                — walk ·{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Mouse</kbd>{' '}
+                — look around
+              </div>
+              <div>
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Click</kbd>{' '}
+                — lock mouse for free-look ·{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Esc</kbd>{' '}
+                — release
+              </div>
+              <div>
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">E</kbd>{' '}
+                — enter nearby building ·{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">V</kbd>{' '}
+                — toggle 1st/3rd person
+              </div>
+              <div className="text-white/60 mt-2 text-[10px] pt-2 border-t border-white/10">
+                Or tap a dot on the mini-map to fast-travel
+              </div>
             </div>
           </div>
         </div>

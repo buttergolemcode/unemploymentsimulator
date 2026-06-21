@@ -3,13 +3,17 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Flame, Calendar, Star, Zap, Bed, Bug, ChevronRight } from 'lucide-react';
+import {
+  DollarSign, Flame, Calendar, Star, Zap, Bed, Bug, ChevronRight,
+  Clock, Eye, Video, MousePointerClick,
+} from 'lucide-react';
 import { useGame, WIN_AMOUNT, MAX_ACTIONS, MAX_DAYS, schemes } from '@/lib/game/store';
 import { formatMoney } from '@/lib/game/format';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { usePlayer } from './playerStore';
 import { walkToBuilding } from './GameCanvas';
 import { BUILDINGS } from './layout';
+import { getTimeOfDay, getDayPhase, formatClock } from './dayNight';
 import type { SchemeId } from '@/lib/game/types';
 
 export function HUDStatsBar() {
@@ -19,6 +23,23 @@ export function HUDStatsBar() {
   const reputation = useGame((s) => s.reputation);
   const actionsLeft = useGame((s) => s.actionsLeft);
   const maxActions = useGame((s) => s.maxActions);
+
+  // Live clock — updates every second
+  const [clock, setClock] = useState('06:00');
+  const [phase, setPhase] = useState<'dawn' | 'day' | 'dusk' | 'night'>('dawn');
+  const [startTime] = useState(() => performance.now());
+  useEffect(() => {
+    let raf: number;
+    const tick = () => {
+      const elapsed = (performance.now() - startTime) / 1000;
+      const t = getTimeOfDay(elapsed, day);
+      setClock(formatClock(t));
+      setPhase(getDayPhase(t));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [day, startTime]);
 
   const progressToWin = useMemo(() => Math.min(100, (money / WIN_AMOUNT) * 100), [money]);
   const daysLeft = Math.max(0, MAX_DAYS - day);
@@ -32,8 +53,11 @@ export function HUDStatsBar() {
           ? 'bg-yellow-500'
           : 'bg-emerald-500';
 
+  const phaseEmoji =
+    phase === 'dawn' ? '🌅' : phase === 'day' ? '☀️' : phase === 'dusk' ? '🌆' : '🌙';
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-3">
       <Card className="p-2 md:p-3 backdrop-blur-md bg-card/80">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wide">
@@ -90,6 +114,57 @@ export function HUDStatsBar() {
           <div className="h-full bg-purple-500 transition-all" style={{ width: `${reputation}%` }} />
         </div>
       </Card>
+
+      <Card className="p-2 md:p-3 backdrop-blur-md bg-card/80">
+        <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wide">
+          <Clock className="h-3 w-3" /> Time
+        </div>
+        <div className="mt-0.5 text-base md:text-xl font-bold tabular-nums leading-none">
+          {phaseEmoji} {clock}
+        </div>
+        <div className="mt-1 text-[9px] text-muted-foreground capitalize">{phase}</div>
+      </Card>
+    </div>
+  );
+}
+
+// Camera mode toggle (first/third person)
+export function CameraToggle() {
+  const cameraMode = usePlayer((s) => s.cameraMode);
+  const toggleCamera = usePlayer((s) => s.toggleCamera);
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="backdrop-blur-md bg-card/80"
+      onClick={toggleCamera}
+      title="Toggle camera (V)"
+    >
+      {cameraMode === 'first' ? <Eye className="h-4 w-4 mr-1" /> : <Video className="h-4 w-4 mr-1" />}
+      {cameraMode === 'first' ? '1st' : '3rd'}
+    </Button>
+  );
+}
+
+// Crosshair for first-person mode
+export function Crosshair() {
+  const cameraMode = usePlayer((s) => s.cameraMode);
+  const pointerLocked = usePlayer((s) => s.pointerLocked);
+  const actionPanelOpen = usePlayer((s) => s.actionPanelOpen);
+  if (cameraMode !== 'first' || actionPanelOpen) return null;
+  return (
+    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
+      <div className="relative w-6 h-6 flex items-center justify-center">
+        <div className="absolute w-0.5 h-0.5 bg-white/80 rounded-full" />
+        <div className="absolute w-4 h-px bg-white/40" />
+        <div className="absolute h-4 w-px bg-white/40" />
+      </div>
+      {!pointerLocked && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/70 text-white text-[10px] px-2 py-0.5 rounded border border-white/20">
+          <MousePointerClick className="inline h-3 w-3 mr-1" />
+          Click to lock mouse
+        </div>
+      )}
     </div>
   );
 }
@@ -100,8 +175,8 @@ export function MiniMap() {
   const pz = usePlayer((s) => s.z);
   const nearbyId = usePlayer((s) => s.nearbyBuildingId);
 
-  // Map world coords (-28..28) to map coords (0..100)
-  const toMap = (n: number) => ((n + 28) / 56) * 100;
+  // Map world coords (-65..65) to map coords (0..100)
+  const toMap = (n: number) => ((n + 65) / 130) * 100;
 
   return (
     <Card className="p-2 backdrop-blur-md bg-card/90 w-[140px] md:w-[180px]">
@@ -144,7 +219,7 @@ export function MiniMap() {
         />
       </div>
       <div className="mt-1 text-[9px] text-muted-foreground">
-        Click a dot to walk there
+        Click a dot to fast-travel
       </div>
     </Card>
   );

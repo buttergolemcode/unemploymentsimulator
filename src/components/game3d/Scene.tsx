@@ -4,9 +4,10 @@ import { useRef, useMemo } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { Text, RoundedBox, Cylinder } from '@react-three/drei';
 import * as THREE from 'three';
-import { BUILDINGS, INTERACT_DISTANCE } from './layout';
+import { BUILDINGS, INTERACT_DISTANCE, FILLER_BUILDINGS, STREETS } from './layout';
 import { usePlayer } from './playerStore';
-import type { BuildingPos } from './layout';
+import { DayNightLighting } from './FollowCamera';
+import type { BuildingPos, FillerBuilding, StreetSegment } from './layout';
 import type { SchemeId } from '../../lib/game/types';
 
 // ---------- Building ----------
@@ -216,11 +217,14 @@ function Ground() {
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     if (actionPanelOpen) return;
+    // In first-person mode, clicks go to the canvas for pointer-lock, not click-to-move
+    const cameraMode = usePlayer.getState().cameraMode;
+    if (cameraMode === 'first') return;
     e.stopPropagation();
     const point = e.point;
     // Clamp to world radius
     const r = Math.sqrt(point.x * point.x + point.z * point.z);
-    const max = 27;
+    const max = 58;
     if (r > max) {
       const scale = max / r;
       moveTo(point.x * scale, point.z * scale);
@@ -263,7 +267,7 @@ function Ground() {
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(8, 8);
+    tex.repeat.set(16, 16);
     return tex;
   }, []);
 
@@ -274,7 +278,7 @@ function Ground() {
       onClick={handleClick}
       receiveShadow
     >
-      <circleGeometry args={[28, 64]} />
+      <circleGeometry args={[62, 96]} />
       <meshStandardMaterial map={gridTexture} roughness={0.95} />
     </mesh>
   );
@@ -326,35 +330,144 @@ function StreetLamp({ x, z }: { x: number; z: number }) {
   );
 }
 
-// ---------- Main scene ----------
-export function GameScene() {
+// ---------- Filler (background) buildings ----------
+function FillerBuildingMesh({ b }: { b: FillerBuilding }) {
+  return (
+    <group position={[b.x, 0, b.z]}>
+      <RoundedBox
+        args={[b.width, b.height, b.depth]}
+        radius={0.1}
+        smoothness={2}
+        position={[0, b.height / 2, 0]}
+        castShadow
+        receiveShadow
+      >
+        <meshStandardMaterial color={b.color} roughness={0.75} metalness={0.1} />
+      </RoundedBox>
+
+      {/* Windows — emissive grid, only if building has them */}
+      {b.hasWindows && (
+        <BuildingWindows width={b.width} height={b.height} depth={b.depth} />
+      )}
+    </group>
+  );
+}
+
+// Shared window component for both scheme and filler buildings.
+function BuildingWindows({
+  width,
+  height,
+  depth,
+}: {
+  width: number;
+  height: number;
+  depth: number;
+}) {
+  const rows = Math.max(1, Math.floor(height / 1.8));
+  const cols = Math.max(1, Math.floor(width / 1.2));
+  const windows = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      // Pseudo-random lit/unlit pattern
+      const seed = (row * 31 + col * 17) % 7;
+      const lit = seed < 3;
+      const wx = (col - (cols - 1) / 2) * 1.2;
+      const wy = 1.2 + row * 1.8;
+      // Front face
+      windows.push(
+        <mesh key={`f-${row}-${col}`} position={[wx, wy, depth / 2 + 0.01]}>
+          <planeGeometry args={[0.55, 0.7]} />
+          <meshStandardMaterial
+            color={lit ? '#fde68a' : '#1f2937'}
+            emissive={lit ? '#fde68a' : '#000000'}
+            emissiveIntensity={lit ? 0.9 : 0}
+            transparent
+            opacity={0.95}
+          />
+        </mesh>,
+      );
+      // Back face (mirrored)
+      windows.push(
+        <mesh key={`b-${row}-${col}`} position={[wx, wy, -depth / 2 - 0.01]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[0.55, 0.7]} />
+          <meshStandardMaterial
+            color={lit ? '#fde68a' : '#1f2937'}
+            emissive={lit ? '#fde68a' : '#000000'}
+            emissiveIntensity={lit ? 0.9 : 0}
+            transparent
+            opacity={0.95}
+          />
+        </mesh>,
+      );
+    }
+  }
+  return <>{windows}</>;
+}
+
+// ---------- Street segments ----------
+function Street({ s }: { s: StreetSegment }) {
+  return (
+    <mesh
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[s.x, 0.02, s.z]}
+      receiveShadow
+    >
+      <planeGeometry args={[s.width, s.depth]} />
+      <meshStandardMaterial color="#18181b" roughness={0.95} />
+    </mesh>
+  );
+}
+
+// Lane markings — dashed yellow line down the middle of each street
+function StreetMarkings({ s }: { s: StreetSegment }) {
+  const dashes: { x: number; z: number }[] = [];
+  const length = s.horizontal ? s.width : s.depth;
+  const count = Math.floor(length / 2.5);
+  for (let i = 0; i < count; i++) {
+    const offset = (i - (count - 1) / 2) * 2.5;
+    dashes.push(
+      s.horizontal ? { x: s.x + offset, z: s.z } : { x: s.x, z: s.z + offset },
+    );
+  }
   return (
     <>
-      {/* Sky / fog */}
-      <color attach="background" args={['#0a0e1a']} />
-      <fog attach="fog" args={['#0a0e1a', 25, 60]} />
+      {dashes.map((d, i) => (
+        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[d.x, 0.04, d.z]}>
+          <planeGeometry args={[s.horizontal ? 1.2 : 0.15, s.horizontal ? 0.15 : 1.2]} />
+          <meshBasicMaterial color="#fbbf24" />
+        </mesh>
+      ))}
+    </>
+  );
+}
 
-      {/* Lighting */}
-      <ambientLight intensity={0.4} />
-      <directionalLight
-        position={[10, 20, 5]}
-        intensity={1.2}
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-camera-far={60}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
-      />
-      <hemisphereLight args={['#3b82f6', '#1a1a1a', 0.3]} />
+// ---------- Main scene ----------
+export function GameScene() {
+  const cameraMode = usePlayer((s) => s.cameraMode);
+  return (
+    <>
+      {/* Lighting + sky/fog — DayNightLighting controls all of these */}
+      <DayNightLighting />
 
-      {/* Ground */}
+      {/* Ground — larger to fit open world */}
       <Ground />
 
-      {/* Buildings */}
+      {/* Streets */}
+      {STREETS.map((s, i) => (
+        <group key={`street-${i}`}>
+          <Street s={s} />
+          <StreetMarkings s={s} />
+        </group>
+      ))}
+
+      {/* Scheme buildings (interactive) */}
       {BUILDINGS.map((b) => (
         <Building key={b.id} b={b} />
+      ))}
+
+      {/* Filler (background) city buildings */}
+      {FILLER_BUILDINGS.map((b, i) => (
+        <FillerBuildingMesh key={`fill-${i}`} b={b} />
       ))}
 
       {/* Street lamps around plaza */}
@@ -362,12 +475,16 @@ export function GameScene() {
       <StreetLamp x={6} z={-4} />
       <StreetLamp x={-6} z={6} />
       <StreetLamp x={6} z={6} />
+      <StreetLamp x={-20} z={-20} />
+      <StreetLamp x={20} z={-20} />
+      <StreetLamp x={-20} z={20} />
+      <StreetLamp x={20} z={20} />
 
-      {/* Player */}
-      <PlayerAvatar />
+      {/* Player avatar — visible only in third-person mode */}
+      {cameraMode === 'third' && <PlayerAvatar />}
 
-      {/* Target marker */}
-      <TargetMarkerLayer />
+      {/* Target marker (third-person only) */}
+      {cameraMode === 'third' && <TargetMarkerLayer />}
     </>
   );
 }

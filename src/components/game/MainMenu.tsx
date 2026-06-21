@@ -40,16 +40,24 @@ export function MainMenu() {
         {/* Controls hint */}
         <div className="mt-4 rounded-lg border bg-muted/30 p-3">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
-            Controls
+            Controls — First-Person (GTA-style)
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
             <div className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">WASD</kbd>
-              <span className="text-muted-foreground">Move</span>
+              <span className="text-muted-foreground">Walk</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">Mouse</kbd>
+              <span className="text-muted-foreground">Look around</span>
             </div>
             <div className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">Click</kbd>
-              <span className="text-muted-foreground">Walk to point</span>
+              <span className="text-muted-foreground">Lock mouse</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">V</kbd>
+              <span className="text-muted-foreground">1st/3rd person</span>
             </div>
             <div className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">E</kbd>
@@ -57,11 +65,11 @@ export function MainMenu() {
             </div>
             <div className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">Esc</kbd>
-              <span className="text-muted-foreground">Exit building</span>
+              <span className="text-muted-foreground">Release mouse / exit</span>
             </div>
           </div>
           <p className="mt-2 text-[10px] text-muted-foreground">
-            Or use the Quick Travel buttons and Mini-Map in-game.
+            Or use the Mini-Map dots in-game to fast-travel to any scheme building.
           </p>
         </div>
 
