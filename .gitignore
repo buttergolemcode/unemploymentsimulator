@@ -52,3 +52,30 @@ prompt
 server.log
 # Skills directory
 /skills/
+# Tauri
+src-tauri/target/
+src-tauri/gen/schemas/
+src-tauri/WixTools/
+*.app
+*.dmg
+*.msi
+*.exe
+!src-tauri/icons/*.ico
+!src-tauri/icons/*.png
+
+# Tauri build artifacts
+bundle/
+.bundle/
+
+# Local environment
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+desktop.ini

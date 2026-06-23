@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
+    "build:static": "TAURI_BUILD=1 next build",
+    "tauri:dev": "bun run build:static && cd src-tauri && cargo tauri dev",
+    "tauri:build": "cd src-tauri && cargo tauri build",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "db:push": "prisma db push",
@@ -51,6 +54,8 @@
     "@reactuses/core": "^6.0.5",
     "@tanstack/react-query": "^5.82.0",
     "@tanstack/react-table": "^8.21.3",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

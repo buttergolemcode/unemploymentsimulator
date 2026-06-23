@@ -98,16 +98,19 @@ This document captures the agreed-upon vision and the sprint roadmap. Update it 
 - Weather: rain particles, wet streets, dynamic fog
 - District lighting: Slums darker, Harbor foggy, etc.
 
-### Sprint B — Vehicles & Driving
-- `@react-three/rapier` for physics
+### Sprint B — Native .exe (Tauri) — VORGEZOGEN
+- Tauri initialisieren (vor Physik, damit wir nicht doppelt optimieren)
+- Next.js Static Export
+- Erste lauffähige .exe
+- GitHub Repo + Releases für Version Control + Auto-Update
+- Code-Signing weglassen (private Projekt, "Trotzdem ausführen" akzeptabel)
+- Browser-dev (`bun run dev`) bleibt für schnelle Iteration möglich
+
+### Sprint C — Vehicles & Driving
+- `@react-three/rapier` for physics — jetzt nativ in Tauri, GPU-beschleunigt
 - First drivable cars (enter/exit, steering, acceleration, collision)
 - Load CC0 car models (Quaternius Cars Pack)
 - Park cars in world, F to enter, camera switches to driver view
-
-### Sprint C — Native .exe (Tauri)
-- Actually initialize Tauri (not just docs)
-- Static export of Next.js
-- First runnable `.exe` build (just packaging, no Rust server yet)
 
 ### Sprint D — Police 2.0
 - Suspicion system (replaces simple Heat)
@@ -164,7 +167,40 @@ This document captures the agreed-upon vision and the sprint roadmap. Update it 
 
 ## Tech Stack
 - Next.js 16 + TypeScript + Three.js (@react-three/fiber + @react-three/drei)
-- @react-three/rapier for physics (Sprint B)
+- @react-three/rapier for physics (Sprint C, after Tauri)
 - Zustand for game state
-- Tauri (Rust) for native .exe wrapper (Sprint C)
+- Tauri (Rust) for native .exe wrapper (Sprint B — vorgezogen)
+- GitHub: Version control + Releases hosting (private repo: buttergolemcode/unemploymentsimulator)
 - Future: Rust WebSocket server for multiplayer (Sprint I)
+
+---
+
+## Update & Distribution Strategy
+
+### Version Control: GitHub (private repo)
+- Code in privatem GitHub Repo: `buttergolemcode/unemploymentsimulator`
+- Jeder Feature-Branch → Pull Request → Merge in `main`
+- Tags für Releases (v0.1.0, v0.2.0, etc.)
+
+### Distribution: GitHub Releases
+- Jede Version = neuer GitHub Release
+- Release enthält: `.exe` Installer + `latest.json` Manifest für Auto-Updater
+- Download-URL: `https://github.com/buttergolemcode/unemploymentsimulator/releases/latest/download/...`
+
+### Auto-Updater (Tauri built-in)
+- Spiel checkt beim Start das `latest.json` Manifest
+- Falls neue Version: Dialog "Update available — Download & Install?"
+- User klickt ja → Download im Hintergrund → Spiel startet neu
+- Code-Signing weggelassen ("Trotzdem ausführen" im SmartScreen akzeptabel für private Projekt)
+
+### Update-Channel
+- `stable` (für normale Spieler / Freunde)
+- `beta` (optional, für Tester die neue Features früh wollen)
+- `dev` (für dich selbst, lokale Builds)
+
+### Zukünftige Erweiterung: Content-Updates ohne .exe-Rebuild
+- Ab Sprint D: Content/Code-Trennung
+- Schemes, Events, Items, Missionen als JSON in `/content/`
+- Code lädt diese zur Runtime
+- Serverseitige Balancing-Tweaks ohne Rebuild möglich
+- Noch nicht aktiv — erst wenn nötig

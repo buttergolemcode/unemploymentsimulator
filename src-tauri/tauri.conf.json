@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Unemployment Simulator",
+  "version": "0.1.0",
+  "identifier": "com.unemploymentsim.game",
+  "build": {
+    "frontendDist": "../out",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run build:static"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Unemployment Simulator 3D",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Game",
+    "shortDescription": "Make $1M without getting a job. Avoid McDonald's.",
+    "longDescription": "Unemployment Simulator 3D — a satirical open-world game where you hustle your way from broke to millionaire via 8 shady schemes: e-com, day trading, gambling, drugs, scams, robbery, tax fraud, and wire fraud. Don't get arrested. Don't end up at McDonald's.",
+    "publisher": "Unemployment Sim"
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/buttergolemcode/unemploymentsimulator/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": ""
+    }
+  }
+}

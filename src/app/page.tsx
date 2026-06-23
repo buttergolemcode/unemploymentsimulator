@@ -7,6 +7,7 @@ import { EventModal } from '@/components/game/EventModal';
 import { MainMenu } from '@/components/game/MainMenu';
 import { EndScreen } from '@/components/game/EndScreen';
 import { ActionLog } from '@/components/game/ActionLog';
+import { UpdateDialog } from '@/components/game/UpdateDialog';
 import { usePlayer } from '@/components/game3d/playerStore';
 import { useEffect, useState } from 'react';
 import {
@@ -197,6 +198,9 @@ export default function Home() {
 
       {/* Random event modal */}
       <EventModal />
+
+      {/* Auto-updater dialog (only visible in Tauri .exe builds, no-op in browser) */}
+      <UpdateDialog />
     </div>
   );
 }

@@ -1,0 +1,11 @@
+{
+  "version": "0.1.0",
+  "notes": "Initial Tauri release of Unemployment Simulator 3D. First playable vertical slice with city, weather, day/night cycle, and 8 schemes.",
+  "pub_date": "2026-06-22T12:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "",
+      "url": "https://github.com/buttergolemcode/unemploymentsimulator/releases/download/v0.1.0/UnemploymentSimulator_0.1.0_x64-setup.exe"
+    }
+  }
+}
