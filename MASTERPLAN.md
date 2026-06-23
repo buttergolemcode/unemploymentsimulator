@@ -98,11 +98,12 @@ This document captures the agreed-upon vision and the sprint roadmap. Update it 
 - Weather: rain particles, wet streets, dynamic fog
 - District lighting: Slums darker, Harbor foggy, etc.
 
-### Sprint B — Native .exe (Tauri) — VORGEZOGEN
+### Sprint B — Native .exe (Tauri) — VORGEZOGEN ✅
 - Tauri initialisieren (vor Physik, damit wir nicht doppelt optimieren)
 - Next.js Static Export
-- Erste lauffähige .exe
-- GitHub Repo + Releases für Version Control + Auto-Update
+- Erste lauffähige .exe ✅
+- GitHub Repo + Releases für Version Control + Auto-Update ✅
+- GitHub Actions CI/CD: Push-Tag → automatischer Build in der Cloud → Release mit .exe + latest.json ✅
 - Code-Signing weglassen (private Projekt, "Trotzdem ausführen" akzeptabel)
 - Browser-dev (`bun run dev`) bleibt für schnelle Iteration möglich
 
@@ -179,12 +180,21 @@ This document captures the agreed-upon vision and the sprint roadmap. Update it 
 
 ### Version Control: GitHub (private repo)
 - Code in privatem GitHub Repo: `buttergolemcode/unemploymentsimulator`
-- Jeder Feature-Branch → Pull Request → Merge in `main`
+- AI macht alle Code-Änderungen, commitet + pusht
 - Tags für Releases (v0.1.0, v0.2.0, etc.)
 
+### CI/CD: GitHub Actions (automatischer Cloud-Build)
+- Workflow: `.github/workflows/build-release.yml`
+- Trigger:
+  - **Tag push `v*.*.*`** → baut Release .exe + veröffentlicht GitHub Release mit .exe + latest.json
+  - **Manual dispatch** → baut Test-Build als Workflow-Artifact (nicht öffentlich)
+- Build-Dauer: ~12-15 Min (erster Build), ~5-7 Min (mit Cache)
+- Läuft auf `windows-latest` GitHub-hosted Runner
+- Cacht Rust-Cargo-Build + Bun node_modules für schnellere Folge-Builds
+
 ### Distribution: GitHub Releases
-- Jede Version = neuer GitHub Release
-- Release enthält: `.exe` Installer + `latest.json` Manifest für Auto-Updater
+- Jede stabile Version = neuer GitHub Release
+- Release enthält: `.exe` NSIS-Installer + `latest.json` Manifest für Auto-Updater
 - Download-URL: `https://github.com/buttergolemcode/unemploymentsimulator/releases/latest/download/...`
 
 ### Auto-Updater (Tauri built-in)
@@ -193,14 +203,9 @@ This document captures the agreed-upon vision and the sprint roadmap. Update it 
 - User klickt ja → Download im Hintergrund → Spiel startet neu
 - Code-Signing weggelassen ("Trotzdem ausführen" im SmartScreen akzeptabel für private Projekt)
 
-### Update-Channel
-- `stable` (für normale Spieler / Freunde)
-- `beta` (optional, für Tester die neue Features früh wollen)
-- `dev` (für dich selbst, lokale Builds)
-
-### Zukünftige Erweiterung: Content-Updates ohne .exe-Rebuild
-- Ab Sprint D: Content/Code-Trennung
-- Schemes, Events, Items, Missionen als JSON in `/content/`
-- Code lädt diese zur Runtime
-- Serverseitige Balancing-Tweaks ohne Rebuild möglich
-- Noch nicht aktiv — erst wenn nötig
+### Workflow aus Users-Sicht (du = Spieler)
+1. Sag der AI: "Neue Version 0.1.0 bauen"
+2. AI pusht Tag `v0.1.0`
+3. GitHub Actions baut automatisch in ~12 Min
+4. GitHub Release mit .exe erscheint
+5. Du startest altes Spiel → Update-Dialog → Klick → Auto-Update → neue Version läuft
