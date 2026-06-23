@@ -8,8 +8,36 @@ import { Loader2, Download, CheckCircle2, AlertCircle } from 'lucide-react';
 export function UpdateDialog() {
   const { checking, updateAvailable, downloading, downloaded, error, version, notes, downloadAndInstall } = useUpdater();
 
-  // Show nothing if: still checking, no update, or already downloaded (and presumably restarting)
-  if (checking || !updateAvailable || downloaded) return null;
+  // Show nothing while checking (silent)
+  if (checking) return null;
+
+  // Show error dialog if updater failed (so user knows something is wrong)
+  if (error && !updateAvailable) {
+    return (
+      <Dialog open={true}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Update check failed
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              The auto-updater couldn't check for updates. You may need to download new versions manually from GitHub.
+              <span className="block mt-2 text-xs text-red-500">{error}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end pt-2">
+            <Button variant="ghost" onClick={() => window.dispatchEvent(new CustomEvent('update-dismissed'))}>
+              Dismiss
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Show nothing if no update available or already downloaded
+  if (!updateAvailable || downloaded) return null;
 
   return (
     <Dialog open={true}>
