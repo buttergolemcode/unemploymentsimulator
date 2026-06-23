@@ -4,12 +4,14 @@ import { useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { usePlayer } from './playerStore';
+import { useVehicle } from './vehicleStore';
 import { useGame } from '../../lib/game/store';
 import { getDayPhase, getTimeOfDay } from './dayNight';
 
 // Camera that switches between first-person and third-person based on player.cameraMode.
 // First-person: camera at player eye height, looks where yaw/pitch point. Pointer-locked.
 // Third-person: camera behind/above player, looking down at them.
+// When in a vehicle: camera is always third-person behind the car (regardless of cameraMode).
 export function FollowCamera() {
   const { camera, gl } = useThree();
   const targetVec = useRef(new THREE.Vector3());
@@ -21,13 +23,28 @@ export function FollowCamera() {
     const phase = useGame.getState().phase;
     if (phase !== 'playing') return;
 
+    // If in a vehicle, always use third-person chase cam (regardless of cameraMode)
+    const inVehicleId = useVehicle.getState().inVehicleId;
+    if (inVehicleId !== null) {
+      const v = useVehicle.getState().vehicles.find((veh) => veh.id === inVehicleId);
+      if (v) {
+        // Chase camera: behind + above the car, based on car's yaw
+        const distance = 7;
+        const height = 3.5;
+        const behindX = Math.sin(v.yaw) * distance;
+        const behindZ = Math.cos(v.yaw) * distance;
+        desiredPos.current.set(v.x + behindX, height, v.z + behindZ);
+        targetVec.current.set(v.x, 1.0, v.z);
+        camera.position.lerp(desiredPos.current, 0.1);
+        camera.lookAt(targetVec.current);
+        return;
+      }
+    }
+
     if (s.cameraMode === 'first') {
       // Eye position
       const eyeY = 1.6;
       desiredPos.current.set(s.x, eyeY, s.z);
-      // Look direction from yaw/pitch
-      // yaw=0 → looking -Z, pitch=0 → level
-      // Forward = (-sin(yaw)*cos(pitch), sin(pitch), -cos(yaw)*cos(pitch))
       const cp = Math.cos(s.pitch);
       lookDir.current.set(
         -Math.sin(s.yaw) * cp,
@@ -35,19 +52,15 @@ export function FollowCamera() {
         -Math.cos(s.yaw) * cp,
       );
       targetVec.current.copy(desiredPos.current).add(lookDir.current);
-
-      // Snap (no lerp) for FPS to avoid motion sickness from lag
       camera.position.copy(desiredPos.current);
       camera.lookAt(targetVec.current);
     } else {
-      // Third-person: behind player based on yaw
       const distance = 6;
       const height = 4;
       const behindX = Math.sin(s.yaw) * distance;
       const behindZ = Math.cos(s.yaw) * distance;
       desiredPos.current.set(s.x + behindX, height, s.z + behindZ);
       targetVec.current.set(s.x, 1.2, s.z);
-
       camera.position.lerp(desiredPos.current, 0.12);
       camera.lookAt(targetVec.current);
     }

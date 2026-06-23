@@ -5,12 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DollarSign, Flame, Calendar, Star, Zap, Bed, Bug,
-  Clock, Eye, Video, MousePointerClick, MapPin,
+  Clock, Eye, Video, MousePointerClick, MapPin, Car, Gauge,
 } from 'lucide-react';
 import { useGame, WIN_AMOUNT, MAX_ACTIONS, MAX_DAYS } from '@/lib/game/store';
 import { formatMoney } from '@/lib/game/format';
 import { useMemo, useEffect, useState } from 'react';
 import { usePlayer } from './playerStore';
+import { useVehicle } from './vehicleStore';
 import { walkToBuilding } from './GameCanvas';
 import { BUILDINGS, districtAt, DISTRICTS } from './layout';
 import { getTimeOfDay, getDayPhase, formatClock } from './dayNight';
@@ -160,12 +161,13 @@ export function CameraToggle() {
   );
 }
 
-// Crosshair for first-person mode
+// Crosshair for first-person mode (hidden when driving)
 export function Crosshair() {
   const cameraMode = usePlayer((s) => s.cameraMode);
   const pointerLocked = usePlayer((s) => s.pointerLocked);
   const actionPanelOpen = usePlayer((s) => s.actionPanelOpen);
-  if (cameraMode !== 'first' || actionPanelOpen) return null;
+  const inVehicle = useVehicle((s) => s.inVehicleId);
+  if (inVehicle !== null || cameraMode !== 'first' || actionPanelOpen) return null;
   return (
     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
       <div className="relative w-6 h-6 flex items-center justify-center">
@@ -179,6 +181,118 @@ export function Crosshair() {
           Click to lock mouse
         </div>
       )}
+    </div>
+  );
+}
+
+// "Press F to enter vehicle" prompt — appears when player is near a vehicle (and on foot)
+export function EnterVehiclePrompt() {
+  const inVehicle = useVehicle((s) => s.inVehicleId);
+  const px = usePlayer((s) => s.x);
+  const pz = usePlayer((s) => s.z);
+  const actionPanelOpen = usePlayer((s) => s.actionPanelOpen);
+  const pendingEvent = useGame((s) => s.pendingEvent);
+
+  if (inVehicle !== null || actionPanelOpen || pendingEvent) return null;
+
+  // Check if any vehicle is in enter-range
+  const vehicles = useVehicle.getState().vehicles;
+  const near = vehicles.find((v) => {
+    const d = Math.sqrt((v.x - px) ** 2 + (v.z - pz) ** 2);
+    return d < 4;
+  });
+  if (!near) return null;
+
+  return (
+    <div className="absolute bottom-32 md:bottom-36 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+      <div className="bg-black/85 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-md border border-emerald-400/40 flex items-center gap-2 shadow-lg">
+        <Car className="h-3.5 w-3.5 text-emerald-400" />
+        Press <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">F</kbd> to enter vehicle
+      </div>
+    </div>
+  );
+}
+
+// Speedometer + drive controls hint — shown when driving
+export function VehicleHUD() {
+  const inVehicleId = useVehicle((s) => s.inVehicleId);
+  const vehicles = useVehicle((s) => s.vehicles);
+  const exitVehicle = useVehicle((s) => s.exitVehicle);
+  if (inVehicleId === null) return null;
+  const v = vehicles.find((veh) => veh.id === inVehicleId);
+  if (!v) return null;
+
+  // Convert m/s to km/h for display
+  const kmh = Math.abs(v.speed) * 3.6;
+  const isReversing = v.speed < -0.1;
+  const throttlePct = Math.min(100, Math.max(0, (Math.abs(v.speed) / v.maxSpeed) * 100));
+
+  return (
+    <>
+      {/* Speedometer — bottom center */}
+      <div className="absolute bottom-20 md:bottom-24 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+        <div className="bg-black/85 backdrop-blur-md text-white px-4 py-2 rounded-lg border border-white/20 flex items-center gap-3">
+          <Gauge className="h-5 w-5 text-emerald-400" />
+          <div className="flex flex-col">
+            <div className="text-xl font-bold tabular-nums leading-none">
+              {kmh.toFixed(0)} <span className="text-xs text-white/60">km/h</span>
+              {isReversing && <span className="ml-2 text-xs text-amber-400">R</span>}
+            </div>
+            {/* Speed bar */}
+            <div className="mt-1 h-1 w-32 bg-white/10 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all ${isReversing ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                style={{ width: `${throttlePct}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Exit button — bottom right above log button */}
+      <div className="absolute bottom-16 right-2 md:bottom-20 md:right-4 z-10 pointer-events-auto">
+        <Button
+          size="sm"
+          variant="outline"
+          className="backdrop-blur-md bg-card/80"
+          onClick={exitVehicle}
+        >
+          <Car className="h-4 w-4 mr-1" />
+          Exit (F)
+        </Button>
+      </div>
+
+      {/* Driving controls hint — top center, fades after a few seconds */}
+      <DriveControlsHint />
+    </>
+  );
+}
+
+// Brief hint shown when first entering a vehicle
+function DriveControlsHint() {
+  const [show, setShow] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setShow(false), 6000);
+    return () => clearTimeout(t);
+  }, []);
+  if (!show) return null;
+  return (
+    <div className="absolute top-32 md:top-40 left-1/2 -translate-x-1/2 z-10 pointer-events-none animate-in fade-in duration-500">
+      <div className="bg-black/85 backdrop-blur-md text-white text-xs px-4 py-2 rounded-lg border border-white/20 text-center max-w-md">
+        <div className="font-semibold mb-1 text-emerald-400">Driving</div>
+        <div>
+          <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">W</kbd> / <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">S</kbd>
+          {' '}— accelerate / reverse ·{' '}
+          <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">A</kbd> / <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">D</kbd>
+          {' '}— steer
+        </div>
+        <div className="mt-1">
+          <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Space</kbd>
+          {' '}— handbrake ·{' '}
+          <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">F</kbd>
+          {' '}— exit vehicle
+        </div>
+      </div>
     </div>
   );
 }

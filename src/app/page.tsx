@@ -17,6 +17,8 @@ import {
   CameraToggle,
   Crosshair,
   DistrictBadge,
+  EnterVehiclePrompt,
+  VehicleHUD,
 } from '@/components/game3d/HUD';
 import { Button } from '@/components/ui/button';
 import { ScrollText as LogIcon, X } from 'lucide-react';
@@ -91,8 +93,14 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Crosshair (first-person only) */}
+      {/* Crosshair (first-person only, hidden when driving) */}
       <Crosshair />
+
+      {/* "Press F to enter vehicle" prompt when near a car */}
+      <EnterVehiclePrompt />
+
+      {/* Speedometer + exit button + controls hint when driving */}
+      <VehicleHUD />
 
       {/* Top-right: mini-map (desktop) */}
       <div className="absolute top-2 right-2 md:top-4 md:right-4 z-10 hidden md:block pointer-events-auto">
@@ -180,8 +188,12 @@ export default function Home() {
                 <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">V</kbd>{' '}
                 — toggle 1st/3rd person
               </div>
+              <div>
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">F</kbd>{' '}
+                — enter/exit vehicle (walk up to a parked car)
+              </div>
               <div className="text-white/60 mt-2 text-[10px] pt-2 border-t border-white/10">
-                In 3rd person: right-click + drag to rotate camera
+                In 3rd person: right-click + drag to rotate camera · In car: WASD = drive, Space = handbrake
               </div>
             </div>
           </div>

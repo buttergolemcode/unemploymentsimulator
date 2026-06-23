@@ -45,7 +45,7 @@ export function MainMenu() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
             <div className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">WASD</kbd>
-              <span className="text-muted-foreground">Walk</span>
+              <span className="text-muted-foreground">Walk / Drive</span>
             </div>
             <div className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">Mouse</kbd>
@@ -64,12 +64,20 @@ export function MainMenu() {
               <span className="text-muted-foreground">Enter building</span>
             </div>
             <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">F</kbd>
+              <span className="text-muted-foreground">Enter / exit car</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">Space</kbd>
+              <span className="text-muted-foreground">Handbrake (in car)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded border bg-card font-mono text-[10px]">Esc</kbd>
               <span className="text-muted-foreground">Release mouse / exit</span>
             </div>
           </div>
           <p className="mt-2 text-[10px] text-muted-foreground">
-            In 3rd person: right-click + drag to rotate camera. Walk to buildings to enter them.
+            Walk to a parked car and press F to drive. In 3rd person: right-click + drag to rotate camera.
           </p>
         </div>
 

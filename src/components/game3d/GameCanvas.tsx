@@ -6,50 +6,60 @@ import * as THREE from 'three';
 import { GameScene } from './Scene';
 import { FollowCamera, PointerLockController } from './FollowCamera';
 import { usePlayer } from './playerStore';
+import { useVehicle } from './vehicleStore';
 import { useGame } from '../../lib/game/store';
 import { BUILDINGS, nearestBuilding } from './layout';
 import type { SchemeId } from '../../lib/game/types';
 
-// Per-frame game tick: updates player movement and triggers nearby-building interactions
+// Per-frame game tick: updates player movement AND vehicle movement
 function GameTick() {
   const lastTime = useRef<number>(0);
   const tick = usePlayer((s) => s.tick);
+  const vehicleTick = useVehicle((s) => s.tick);
 
   useFrame((state) => {
     const now = state.clock.elapsedTime;
-    const dt = Math.min(0.1, now - lastTime.current);
+    let dt = now - lastTime.current;
+    if (!isFinite(dt) || dt < 0) dt = 0.016;
+    dt = Math.min(0.1, dt);
     lastTime.current = now;
     tick(dt);
+    vehicleTick(dt);
   });
 
   return null;
 }
 
-// Keyboard handler: E to enter nearby building, WASD/arrows to move, V to toggle camera
-// Both first-person AND third-person use the SAME yaw-relative movement logic.
-// This eliminates the "inverted / random WASD" bug when switching camera modes.
+// Keyboard handler: E to enter building, F to enter/exit vehicle, WASD/arrows to move/drive, V to toggle camera
 function KeyboardController() {
   const setActionPanel = usePlayer((s) => s.setActionPanel);
   const toggleCamera = usePlayer((s) => s.toggleCamera);
   const setFpsInput = usePlayer((s) => s.setFpsInput);
+  const enterVehicle = useVehicle((s) => s.enterVehicle);
+  const exitVehicle = useVehicle((s) => s.exitVehicle);
+  const setVehicleInput = useVehicle((s) => s.setInput);
 
   // Refs that mirror frequently-changing store values without causing effect re-runs
   const nearbyRef = useRef<SchemeId | null>(null);
   const panelOpenRef = useRef<boolean>(false);
   const cameraModeRef = useRef<'first' | 'third'>('first');
+  const inVehicleRef = useRef<number | null>(null);
   const keys = useRef<Record<string, boolean>>({});
 
-  // Keep refs in sync with the store (subscribe via selector that returns cameraMode so we re-run on changes)
+  // Keep refs in sync with the stores
   usePlayer((s) => {
     nearbyRef.current = s.nearbyBuildingId;
     panelOpenRef.current = s.actionPanelOpen;
     cameraModeRef.current = s.cameraMode;
     return s.cameraMode;
   });
+  useVehicle((s) => {
+    inVehicleRef.current = s.inVehicleId;
+    return s.inVehicleId;
+  });
 
-  // Helper: compute normalized {forward, right} input from currently-pressed keys.
-  // W/Up = forward (+1), S/Down = backward (-1), A/Left = left (-1), D/Right = right (+1).
-  const computeInput = () => {
+  // Compute on-foot input (forward/right for walking)
+  const computeFootInput = () => {
     const k = keys.current;
     let forward = 0;
     let right = 0;
@@ -57,7 +67,6 @@ function KeyboardController() {
     if (k['s'] || k['arrowdown']) forward -= 1;
     if (k['a'] || k['arrowleft']) right -= 1;
     if (k['d'] || k['arrowright']) right += 1;
-    // Clamp magnitude so diagonal isn't faster
     const len = Math.sqrt(forward * forward + right * right);
     if (len > 1) {
       forward /= len;
@@ -66,21 +75,54 @@ function KeyboardController() {
     return { forward, right };
   };
 
+  // Compute vehicle input (throttle/brake/steer for driving)
+  // W = throttle forward, S = brake/reverse, A/D = steer left/right, Space = handbrake
+  const computeVehicleInput = () => {
+    const k = keys.current;
+    let throttle = 0;
+    let brake = 0;
+    let steer = 0;
+    if (k['w'] || k['arrowup']) throttle += 1;
+    if (k['s'] || k['arrowdown']) throttle -= 1; // reverse
+    if (k['a'] || k['arrowleft']) steer -= 1;
+    if (k['d'] || k['arrowright']) steer += 1;
+    if (k[' ']) brake = 1;  // space = handbrake
+    return { throttle, brake, steer };
+  };
+
+  // Update whichever input mode is active
+  const updateActiveInput = () => {
+    if (inVehicleRef.current !== null) {
+      setVehicleInput(computeVehicleInput());
+    } else {
+      setFpsInput(computeFootInput());
+    }
+  };
+
   useEffect(() => {
     const handleDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
-      // V toggles camera mode — and we re-sync the input so movement continues smoothly
+      // V toggles camera mode
       if (e.key === 'v' || e.key === 'V') {
         toggleCamera();
-        // After toggle, recompute FPS input so movement keeps flowing in the new mode
-        setTimeout(() => setFpsInput(computeInput()), 0);
+        setTimeout(() => updateActiveInput(), 0);
         e.preventDefault();
         return;
       }
-      // E to enter building
-      if ((e.key === 'e' || e.key === 'E') && nearbyRef.current && !panelOpenRef.current) {
+      // F to enter/exit vehicle
+      if (e.key === 'f' || e.key === 'F') {
+        if (inVehicleRef.current !== null) {
+          exitVehicle();
+        } else if (!panelOpenRef.current) {
+          enterVehicle();
+        }
+        e.preventDefault();
+        return;
+      }
+      // E to enter building (only when on foot, not in vehicle)
+      if ((e.key === 'e' || e.key === 'E') && nearbyRef.current && !panelOpenRef.current && inVehicleRef.current === null) {
         setActionPanel(true);
         e.preventDefault();
         return;
@@ -92,17 +134,16 @@ function KeyboardController() {
       }
 
       keys.current[e.key.toLowerCase()] = true;
-      // Always update FPS input (used by BOTH camera modes for movement)
-      setFpsInput(computeInput());
+      updateActiveInput();
     };
     const handleUp = (e: KeyboardEvent) => {
       keys.current[e.key.toLowerCase()] = false;
-      setFpsInput(computeInput());
+      updateActiveInput();
     };
     const handleBlur = () => {
-      // Clear all keys when window loses focus (prevents "stuck key" bugs)
       keys.current = {};
       setFpsInput({ forward: 0, right: 0 });
+      setVehicleInput({ throttle: 0, brake: 0, steer: 0 });
     };
     window.addEventListener('keydown', handleDown);
     window.addEventListener('keyup', handleUp);
@@ -113,7 +154,7 @@ function KeyboardController() {
       window.removeEventListener('keyup', handleUp);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [setActionPanel, toggleCamera, setFpsInput]);
+  }, [setActionPanel, toggleCamera, setFpsInput, enterVehicle, exitVehicle, setVehicleInput]);
 
   return null;
 }

@@ -9,6 +9,7 @@ import { usePlayer } from './playerStore';
 import { DayNightLighting } from './FollowCamera';
 import { NPCLayer } from './NPCs';
 import { Weather } from './Weather';
+import { VehicleLayer } from './Vehicles';
 import type { BuildingPos, FillerBuilding, StreetSegment } from './layout';
 import type { SchemeId } from '../../lib/game/types';
 
@@ -506,6 +507,9 @@ export function GameScene() {
 
       {/* NPCs — pedestrians + merchants */}
       <NPCLayer />
+
+      {/* Parked vehicles (drivable) */}
+      <VehicleLayer />
 
       {/* Weather (rain + fog) */}
       <Weather />
