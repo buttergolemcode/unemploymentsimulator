@@ -1,0 +1,11 @@
+{
+  "version": "0.0.2-test",
+  "notes": "Auto-built release 0.0.2-test from commit 033e5a891138c9643559fb96e12dbfe26fe5e295",
+  "pub_date": "2026-06-23T11:46:28Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "",
+      "url": "https://github.com/buttergolemcode/unemploymentsimulator/releases/download/v0.0.2-test-test/UnemploymentSimulator_0.0.2-test_x64-setup.exe"
+    }
+  }
+}
