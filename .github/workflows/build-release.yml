@@ -106,8 +106,8 @@ jobs:
         id: find_exe
         shell: bash
         run: |
-          # Locate the NSIS installer
-          EXE=$(find src-tauri/target/release/bundle/nsis -name "*-setup.exe" | head -1)
+          # Locate the NSIS installer (use find with -print0 to handle spaces in filenames)
+          EXE=$(find src-tauri/target/release/bundle/nsis -name "*-setup.exe" -print0 | head -z -n1 | tr -d '\0')
           if [ -z "$EXE" ]; then
             echo "ERROR: No NSIS installer found"
             ls -R src-tauri/target/release/bundle/ 2>&1 || true
@@ -119,18 +119,25 @@ jobs:
           cp "$EXE" "UnemploymentSimulator_${RELEASE_VERSION}_x64-setup.exe"
           echo "UPLOAD_FILE=UnemploymentSimulator_${RELEASE_VERSION}_x64-setup.exe" >> $GITHUB_ENV
 
-          # Find the .sig file (same name as the .exe but with .sig extension)
+          # Find the .sig file (Tauri creates it next to the .exe with .sig extension)
           SIG_FILE="${EXE}.sig"
+          echo "Looking for signature at: $SIG_FILE"
           if [ -f "$SIG_FILE" ]; then
             echo "Found signature: $SIG_FILE"
             cp "$SIG_FILE" "UnemploymentSimulator_${RELEASE_VERSION}_x64-setup.exe.sig"
             echo "UPLOAD_SIG=UnemploymentSimulator_${RELEASE_VERSION}_x64-setup.exe.sig" >> $GITHUB_ENV
-            # Read the signature content for latest.json
-            SIGNATURE=$(cat "UnemploymentSimulator_${RELEASE_VERSION}_x64-setup.exe.sig")
-            echo "SIGNATURE=${SIGNATURE}" >> $GITHUB_ENV
+            # Read the signature content — it's a single line of base64
+            # Use read to avoid shell expansion issues
+            SIGNATURE=$(cat "UnemploymentSimulator_${RELEASE_VERSION}_x64-setup.exe.sig" | tr -d '\n')
+            # Write to a file to avoid env-var escaping issues, then read back in next step
+            echo "$SIGNATURE" > /tmp/signature.txt
+            echo "SIGNATURE_FILE=/tmp/signature.txt" >> $GITHUB_ENV
+            echo "Signature length: ${#SIGNATURE}"
           else
-            echo "WARNING: No .sig file found — updates will not be verifiable!"
-            echo "SIGNATURE=" >> $GITHUB_ENV
+            echo "WARNING: No .sig file found at $SIG_FILE — updates will not be verifiable!"
+            echo "Listing directory contents:"
+            ls -la "$(dirname "$EXE")" 2>&1 || true
+            echo "SIGNATURE_FILE=" >> $GITHUB_ENV
           fi
 
       # ---------- Generate latest.json ----------
@@ -144,20 +151,29 @@ jobs:
           fi
           DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${UPLOAD_FILE}"
 
-          # Write latest.json with the actual signature from the .sig file
-          cat > latest.json << JSONEOF
-          {
-            "version": "${RELEASE_VERSION}",
-            "notes": "Unemployment Simulator ${RELEASE_VERSION} — auto-built from commit ${{ github.sha }}",
-            "pub_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-            "platforms": {
-              "windows-x86_64": {
-                "signature": "${SIGNATURE}",
-                "url": "${DOWNLOAD_URL}"
+          # Read signature from file if it exists
+          SIGNATURE=""
+          if [ -n "${SIGNATURE_FILE}" ] && [ -f "${SIGNATURE_FILE}" ]; then
+            SIGNATURE=$(cat "${SIGNATURE_FILE}" | tr -d '\n')
+          fi
+
+          # Use Python to generate JSON safely (avoids bash escaping issues with base64 sig)
+          python3 -c "
+          import json, sys
+          data = {
+            'version': '${RELEASE_VERSION}',
+            'notes': 'Unemployment Simulator ${RELEASE_VERSION} — auto-built from commit ${{ github.sha }}',
+            'pub_date': '$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")',
+            'platforms': {
+              'windows-x86_64': {
+                'signature': sys.argv[1],
+                'url': '${DOWNLOAD_URL}'
               }
             }
           }
-          JSONEOF
+          with open('latest.json', 'w') as f:
+            json.dump(data, f, indent=2)
+          " "$SIGNATURE"
           echo "Generated latest.json:"
           cat latest.json
 
