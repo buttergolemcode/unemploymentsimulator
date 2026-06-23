@@ -155,8 +155,10 @@ export const useVehicle = create<VehicleStore>((set, get) => ({
     }
     if (!target) return false;
     set({ inVehicleId: target.id });
-    // Snap player position to vehicle (so when they exit, they don't get stuck in a wall)
-    usePlayer.getState().setActionPanel(true); // pause player movement while driving
+    // Sync player yaw to car yaw so the chase camera starts behind the car
+    usePlayer.setState({ yaw: target.yaw, pitch: 0 });
+    // Pause player movement while driving (actionPanel acts as a "movement disabled" flag)
+    usePlayer.getState().setActionPanel(true);
     return true;
   },
 
@@ -228,18 +230,22 @@ export const useVehicle = create<VehicleStore>((set, get) => ({
     }
 
     // Steering (only effective when moving; scales with speed)
+    // Player yaw convention: yaw=0 = facing -Z, increasing yaw = turning LEFT (CCW around Y)
+    // So steer=+1 (D, want right) must DECREASE yaw.
     const speedFactor = Math.min(1, Math.abs(v.speed) / 5); // full steer at 5 m/s+
     const turn = steer * v.turnRate * speedFactor * dt;
-    // Reverse steering direction when going backwards (so it feels like a real car)
+    // Invert steering when reversing (real-car behavior)
     if (v.speed < 0) {
-      v.yaw -= turn;
-    } else {
       v.yaw += turn;
+    } else {
+      v.yaw -= turn;
     }
 
-    // Compute new position
-    const dx = Math.sin(v.yaw) * v.speed * dt;
-    const dz = Math.cos(v.yaw) * v.speed * dt;
+    // Compute new position — use same convention as player movement:
+    // forward (speed > 0) = (-sin(yaw), -cos(yaw)) in world coords
+    // This matches the player's yaw convention (yaw=0 = facing -Z)
+    const dx = -Math.sin(v.yaw) * v.speed * dt;
+    const dz = -Math.cos(v.yaw) * v.speed * dt;
 
     // Try X movement
     const newX = v.x + dx;

@@ -24,18 +24,24 @@ export function FollowCamera() {
     if (phase !== 'playing') return;
 
     // If in a vehicle, always use third-person chase cam (regardless of cameraMode)
+    // Mouse drag (right button held) rotates the camera around the car.
     const inVehicleId = useVehicle.getState().inVehicleId;
     if (inVehicleId !== null) {
       const v = useVehicle.getState().vehicles.find((veh) => veh.id === inVehicleId);
       if (v) {
-        // Chase camera: behind + above the car, based on car's yaw
-        const distance = 7;
-        const height = 3.5;
-        const behindX = Math.sin(v.yaw) * distance;
-        const behindZ = Math.cos(v.yaw) * distance;
+        // Use the player's yaw as the camera orbit angle (so dragging mouse
+        // updates player.yaw which we then use here as camera-yaw offset from car yaw).
+        // This way the chase cam follows the car but the player can look around.
+        const camYaw = s.yaw; // player yaw is updated by mouse-drag in PointerLockController
+        const distance = 8;
+        const height = 3.8;
+        // Camera positioned behind the car based on camYaw (not car yaw):
+        // forward of car at camYaw=0 is -Z, so behind = +Z
+        const behindX = Math.sin(camYaw) * distance;
+        const behindZ = Math.cos(camYaw) * distance;
         desiredPos.current.set(v.x + behindX, height, v.z + behindZ);
-        targetVec.current.set(v.x, 1.0, v.z);
-        camera.position.lerp(desiredPos.current, 0.1);
+        targetVec.current.set(v.x, 1.2, v.z);
+        camera.position.lerp(desiredPos.current, 0.12);
         camera.lookAt(targetVec.current);
         return;
       }
@@ -126,21 +132,33 @@ export function PointerLockController() {
     };
     const onMouseMove = (e: MouseEvent) => {
       const s = usePlayer.getState();
+      const inVehicleId = useVehicle.getState().inVehicleId;
+
+      // In a vehicle: right-button-drag rotates the chase camera around the car
+      // (yaw only, no pitch). This updates player.yaw which the FollowCamera reads
+      // as the camera orbit angle — separate from the car's heading (v.yaw).
+      if (inVehicleId !== null) {
+        if ((e.buttons & 2) !== 0) {
+          s.applyMouseDelta(e.movementX, 0);
+        }
+        return;
+      }
+
       // First-person: pointer-locked mouse-look (yaw + pitch)
       if (s.pointerLocked && s.cameraMode === 'first') {
         s.applyMouseDelta(e.movementX, e.movementY);
         return;
       }
-      // Third-person: right-button-drag to look around (yaw only, no pitch in 3rd person)
+      // Third-person: right-button-drag to look around (yaw only)
       if (s.cameraMode === 'third' && (e.buttons & 2) !== 0) {
-        // Apply only horizontal mouse delta to yaw (positive movementX = look right)
         s.applyMouseDelta(e.movementX, 0);
       }
     };
-    // Prevent context menu so right-click can be used for camera drag
+    // Prevent context menu so right-click can be used for camera drag (in 3rd person or in vehicle)
     const onContextMenu = (e: MouseEvent) => {
       const s = usePlayer.getState();
-      if (s.cameraMode === 'third') e.preventDefault();
+      const inVehicleId = useVehicle.getState().inVehicleId;
+      if (s.cameraMode === 'third' || inVehicleId !== null) e.preventDefault();
     };
 
     canvas.addEventListener('click', onClick);

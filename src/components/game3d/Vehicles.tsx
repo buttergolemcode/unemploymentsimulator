@@ -14,11 +14,14 @@ export function CarMesh({ vehicle }: { vehicle: VehicleState }) {
   useFrame(() => {
     if (!ref.current) return;
     ref.current.position.set(vehicle.x, 0, vehicle.z);
-    ref.current.rotation.y = vehicle.yaw;
+    // Yaw + π to make car's local +Z (where headlights are) point in the
+    // "forward" direction used by movement (which is -Z world at yaw=0,
+    // same as player). Without this, the car would drive backwards visually.
+    ref.current.rotation.y = vehicle.yaw + Math.PI;
   });
 
   return (
-    <group ref={ref} position={[vehicle.x, 0, vehicle.z]} rotation={[0, vehicle.yaw, 0]}>
+    <group ref={ref} position={[vehicle.x, 0, vehicle.z]} rotation={[0, vehicle.yaw + Math.PI, 0]}>
       {/* Body — main chassis, 4.4m long, 2m wide, 0.7m tall, centered at y=0.6 */}
       <mesh position={[0, 0.6, 0]} castShadow receiveShadow>
         <boxGeometry args={[2, 0.7, 4.4]} />
