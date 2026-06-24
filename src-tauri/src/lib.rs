@@ -9,14 +9,9 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            #[cfg(debug_assertions)]
-            {
-                let window = app.get_webview_window("main").unwrap();
-                window.open_devtools();
-            }
-
             // ====== AUTO-UPDATE CHECK FROM RUST SIDE ======
             // This runs BEFORE the frontend loads, so it works even if JS fails.
+            // No dependency on window.__TAURI__ or dynamic imports.
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 println!("[Updater] Starting update check from Rust...");
@@ -62,15 +57,12 @@ pub fn run() {
                 }
 
                 println!("[Updater] Downloading update...");
-                // download_and_install: first closure takes 2 args (downloaded, total),
-                // second closure is on_download_complete.
                 match update.download_and_install(
                     |_a, _b| {},
                     || {},
                 ).await {
                     Ok(()) => {
                         println!("[Updater] Update installed successfully");
-                        // On Windows, the installer restarts the app automatically
                     }
                     Err(e) => {
                         eprintln!("[Updater] Failed to install update: {}", e);
