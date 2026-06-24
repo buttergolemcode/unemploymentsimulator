@@ -61,11 +61,21 @@ export default function Home() {
   // The 'Enter Building' button below also handles click-to-open.
 
   if (phase === 'menu') {
-    return <MainMenu />;
+    return (
+      <>
+        <MainMenu />
+        <UpdateDialog />
+      </>
+    );
   }
 
   if (phase === 'won' || phase === 'lost') {
-    return <EndScreen />;
+    return (
+      <>
+        <EndScreen />
+        <UpdateDialog />
+      </>
+    );
   }
 
   return (

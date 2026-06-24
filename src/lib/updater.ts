@@ -44,19 +44,23 @@ export function useUpdater() {
     // Only run in Tauri (window.__TAURI__ exists when running as .exe)
     const w = window as unknown as { __TAURI__?: unknown };
     if (!w.__TAURI__) {
-      // Browser dev mode — no updater
+      console.log('[Updater] Not in Tauri — skipping (browser dev mode)');
       return;
     }
 
+    console.log('[Updater] Running in Tauri — checking for updates...');
     let cancelled = false;
 
     async function checkForUpdates() {
       try {
         setState((s) => ({ ...s, checking: true, error: null }));
+        console.log('[Updater] Importing @tauri-apps/plugin-updater...');
         const { check } = await import('@tauri-apps/plugin-updater');
+        console.log('[Updater] Calling check()...');
         const update = await check();
         if (cancelled) return;
         if (update) {
+          console.log(`[Updater] Update available: v${update.version}`);
           setState((s) => ({
             ...s,
             checking: false,
@@ -65,9 +69,11 @@ export function useUpdater() {
             notes: update.body,
           }));
         } else {
+          console.log('[Updater] No update available — already on latest version');
           setState((s) => ({ ...s, checking: false, updateAvailable: false }));
         }
       } catch (err) {
+        console.error('[Updater] Error:', err);
         if (cancelled) return;
         setState((s) => ({
           ...s,
