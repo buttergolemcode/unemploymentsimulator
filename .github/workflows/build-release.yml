@@ -69,18 +69,22 @@ jobs:
           echo "RELEASE_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
           echo "Building test version ${{ github.event.inputs.version }}"
 
-      - name: Bump version in tauri.conf.json
+      - name: Bump version in tauri.conf.json AND Cargo.toml
         shell: bash
         run: |
-          # Patch the version field in tauri.conf.json
+          # Patch version in tauri.conf.json
           node -e "
             const fs = require('fs');
             const path = 'src-tauri/tauri.conf.json';
             const conf = JSON.parse(fs.readFileSync(path, 'utf8'));
             conf.version = process.env.RELEASE_VERSION;
             fs.writeFileSync(path, JSON.stringify(conf, null, 2));
-            console.log('Updated version to', conf.version);
+            console.log('Updated tauri.conf.json version to', conf.version);
           "
+          # Patch version in Cargo.toml (CRITICAL: CARGO_PKG_VERSION is read by the updater!)
+          sed -i 's/^version = .*/version = "'"$RELEASE_VERSION"'"/' src-tauri/Cargo.toml
+          echo "Updated Cargo.toml version to $RELEASE_VERSION"
+          head -5 src-tauri/Cargo.toml
 
       # ---------- Build ----------
       - name: Install frontend deps

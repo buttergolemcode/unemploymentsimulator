@@ -1,6 +1,6 @@
 [package]
 name = "unemployment-simulator"
-version = "0.5.1"
+version = "0.5.3"
 description = "Make $1M without getting a job. Avoid McDonald's."
 authors = ["you"]
 edition = "2021"

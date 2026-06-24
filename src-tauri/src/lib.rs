@@ -175,27 +175,59 @@ fn check_and_update(installed_version: &str) {
     
     println!("[Updater] Saved to: {:?}", temp_exe);
     
-    // Step 6: Run the NSIS installer silently (/S = silent, /D = install dir)
-    // We spawn it and then exit the current app so the installer can replace files
-    show_message_box("Installing", "The update will now install and restart the app.", false);
+    // Step 6: Run the NSIS installer and wait for it to finish
+    // NSIS with /S runs silently. We WAIT for it (not spawn) so we know when it's done.
+    show_message_box("Installing", "Installing update... The app will restart automatically.", false);
     
     let install_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-        .unwrap_or_else(|| std::path::PathBuf::from("C:\\Program Files\\Unemployment Simulator"));
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
     
-    println!("[Updater] Running installer silently to: {:?}", install_dir);
+    println!("[Updater] Running installer to: {:?}", install_dir);
     
-    // NSIS silent install: /S for silent, /D= for install directory
-    match Command::new(&temp_exe)
+    // Run installer with /S (silent) and /D (install dir)
+    // We use .wait() to block until install is complete
+    let installer_result = Command::new(&temp_exe)
         .arg("/S")
         .arg(format!("/D={}", install_dir.to_string_lossy()))
-        .spawn()
-    {
-        Ok(_) => {
-            println!("[Updater] Installer spawned successfully — exiting app");
-            // Exit the current app so the installer can replace files
-            std::process::exit(0);
+        .spawn();
+    
+    match installer_result {
+        Ok(mut child) => {
+            // Wait for installer to finish
+            match child.wait() {
+                Ok(status) => {
+                    println!("[Updater] Installer finished with status: {}", status);
+                    
+                    // Clean up temp file
+                    let _ = std::fs::remove_file(&temp_exe);
+                    
+                    // Restart the app
+                    let exe_path = std::env::current_exe().unwrap_or_default();
+                    println!("[Updater] Restarting app: {:?}", exe_path);
+                    
+                    // Spawn new instance and exit
+                    match Command::new(&exe_path).spawn() {
+                        Ok(_) => {
+                            println!("[Updater] New instance spawned — exiting old one");
+                            std::process::exit(0);
+                        }
+                        Err(e) => {
+                            show_message_box("Restart Failed", 
+                                &format!("Update installed but couldn't restart automatically.\nPlease launch the game manually.\n\nError: {}", e), 
+                                false);
+                            std::process::exit(0);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[Updater] Installer wait failed: {}", e);
+                    show_message_box("Update Warning",
+                        &format!("Installer may not have completed properly.\nPlease restart the game manually.\n\nError: {}", e),
+                        false);
+                }
+            }
         }
         Err(e) => {
             let msg = format!("Failed to start installer: {}\n\nThe update file was saved to:\n{:?}", e, temp_exe);
