@@ -62,9 +62,10 @@ pub fn run() {
                 }
 
                 println!("[Updater] Downloading update...");
-                // download_and_install takes two closures: progress callback + on_download_complete
+                // download_and_install: first closure takes 2 args (downloaded, total),
+                // second closure is on_download_complete.
                 match update.download_and_install(
-                    |_progress| {},
+                    |_a, _b| {},
                     || {},
                 ).await {
                     Ok(()) => {
