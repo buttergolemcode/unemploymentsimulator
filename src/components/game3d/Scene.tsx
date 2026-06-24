@@ -10,6 +10,7 @@ import { DayNightLighting } from './FollowCamera';
 import { NPCLayer } from './NPCs';
 import { Weather } from './Weather';
 import { VehicleLayer } from './Vehicles';
+import { MapBorders } from './MapBorders';
 import { createTerrainGeometry, applyTerrainColors, terrainHeight, WATER_LEVEL, createWaterGeometry } from './terrain';
 import type { BuildingPos, FillerBuilding, StreetSegment } from './layout';
 import type { SchemeId } from '../../lib/game/types';
@@ -236,10 +237,10 @@ function Terrain() {
     }
   };
 
-  // Build terrain geometry once
+  // Build terrain geometry once — much larger than world radius to prevent white-screen at edges
   const terrainGeo = useMemo(() => {
-    const TERRAIN_SIZE = WORLD_RADIUS * 2 + 40;
-    const SEGMENTS = 200; // 200×200 = 40k verts, good balance of detail vs perf
+    const TERRAIN_SIZE = 600; // 600×600m — extends far beyond playable area
+    const SEGMENTS = 180;
     const geo = createTerrainGeometry(TERRAIN_SIZE, SEGMENTS);
     applyTerrainColors(geo);
     return geo;
@@ -258,7 +259,7 @@ function Terrain() {
 function WaterSurface() {
   const waterRef = useRef<THREE.Mesh>(null);
   const waterGeo = useMemo(() => {
-    return createWaterGeometry(WORLD_RADIUS * 2 + 40, 80);
+    return createWaterGeometry(600, 80);
   }, []);
 
   // Animate water vertices with gentle sine waves
@@ -469,6 +470,9 @@ export function GameScene() {
 
       {/* Water surface — ocean + harbor basin */}
       <WaterSurface />
+
+      {/* Map borders — mountains, forest, highway barricade, military fence */}
+      <MapBorders />
 
       {/* Streets */}
       {STREETS.map((s, i) => (

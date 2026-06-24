@@ -254,7 +254,7 @@ export function DayNightLighting() {
   return (
     <>
       <color ref={bgRef} attach="background" args={['#1e3a8a']} />
-      <fog ref={fogRef} attach="fog" args={['#1e3a8a', 30, 90]} />
+      <fog ref={fogRef} attach="fog" args={['#1e3a8a', 50, 400]} />
       <ambientLight ref={ambientRef} intensity={0.4} />
       <hemisphereLight ref={hemiRef} args={['#3b82f6', '#1a1a1a', 0.3]} />
       <directionalLight
