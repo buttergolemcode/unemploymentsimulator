@@ -38,15 +38,5 @@
     "shortDescription": "Make $1M without getting a job. Avoid McDonald's.",
     "longDescription": "Unemployment Simulator 3D — a satirical open-world game where you hustle your way from broke to millionaire via 8 shady schemes: e-com, day trading, gambling, drugs, scams, robbery, tax fraud, and wire fraud. Don't get arrested. Don't end up at McDonald's.",
     "publisher": "Unemployment Sim"
-  },
-  "plugins": {
-    "updater": {
-      "active": true,
-      "endpoints": [
-        "https://github.com/buttergolemcode/unemploymentsimulator/releases/latest/download/latest.json"
-      ],
-      "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdGNzQ0QzEyMjFGMTM2MUIKUldRYk52RWhFa3gwZjY5WWxjbkR2d2gxdmhLSElNcmx0eFRENkpCby9nVUF6K0FnQmp0c3gxdzEK"
-    }
   }
 }
