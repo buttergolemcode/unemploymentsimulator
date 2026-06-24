@@ -4,7 +4,7 @@
 // bodies later when we want crashes/flips/etc.
 
 import { create } from 'zustand';
-import { BUILDINGS, FILLER_BUILDINGS } from './layout';
+import { BUILDINGS, FILLER_BUILDINGS, WORLD_RADIUS } from './layout';
 import { usePlayer } from './playerStore';
 
 export interface VehicleState {
@@ -25,10 +25,13 @@ export interface VehicleState {
   length: number;       // for collision
 }
 
-// Pre-computed building AABBs for vehicle collision (slightly larger than player AABBs
-// because vehicles are bigger — we use the vehicle's half-extent).
+// Pre-computed building AABBs for vehicle collision.
+// Vehicle hitbox is the actual car size (not inflated — the AABB already accounts for it).
 const VEHICLE_HALF_W = 1.0;  // 2m wide car
 const VEHICLE_HALF_L = 2.2;  // 4.4m long car
+
+// World bounds for vehicles
+const VEHICLE_WORLD_MAX = WORLD_RADIUS - 5;
 
 interface AABB {
   minX: number;
@@ -58,9 +61,6 @@ function isBlocked(x: number, z: number): boolean {
   }
   return false;
 }
-
-// World bounds for vehicles (slightly tighter than player since they're bigger)
-const VEHICLE_WORLD_MAX = 58;
 
 interface VehicleStore {
   vehicles: VehicleState[];

@@ -1,11 +1,10 @@
 // Player movement store — separate from game logic state
 import { create } from 'zustand';
-import { PLAYER_SPAWN, INTERACT_DISTANCE, nearestBuilding, BUILDINGS, FILLER_BUILDINGS } from './layout';
+import { PLAYER_SPAWN, INTERACT_DISTANCE, nearestBuilding, BUILDINGS, FILLER_BUILDINGS, WORLD_RADIUS } from './layout';
 import type { SchemeId } from '../../lib/game/types';
 import { setActionPanelOpen } from '../../lib/game/store';
 
 // Pre-compute building AABBs once for collision (expanded by player radius).
-// Each entry: { minX, maxX, minZ, maxZ }
 const PLAYER_RADIUS = 0.5;
 
 interface AABB {
@@ -105,10 +104,10 @@ interface PlayerStore {
   fpsMoving: boolean;
 }
 
-const SPEED = 7; // units per second (third-person click-to-move)
-const FPS_SPEED = 5.5; // units per second (first-person WASD)
-const PITCH_LIMIT = Math.PI / 2 - 0.05; // ~85 degrees
-const WORLD_MAX = 60; // world bounds (enlarged for open-world)
+const SPEED = 7;
+const FPS_SPEED = 5.5;
+const PITCH_LIMIT = Math.PI / 2 - 0.05;
+const WORLD_MAX = WORLD_RADIUS; // 110m radius
 
 export const usePlayer = create<PlayerStore>((set, get) => ({
   x: PLAYER_SPAWN[0],

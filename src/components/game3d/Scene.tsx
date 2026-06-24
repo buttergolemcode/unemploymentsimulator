@@ -4,7 +4,7 @@ import { useRef, useMemo } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { Text, RoundedBox, Cylinder } from '@react-three/drei';
 import * as THREE from 'three';
-import { BUILDINGS, INTERACT_DISTANCE, FILLER_BUILDINGS, STREETS, DISTRICTS, districtAt } from './layout';
+import { BUILDINGS, INTERACT_DISTANCE, FILLER_BUILDINGS, STREETS, DISTRICTS, districtAt, WORLD_RADIUS } from './layout';
 import { usePlayer } from './playerStore';
 import { DayNightLighting } from './FollowCamera';
 import { NPCLayer } from './NPCs';
@@ -227,7 +227,7 @@ function Ground() {
     const point = e.point;
     // Clamp to world radius
     const r = Math.sqrt(point.x * point.x + point.z * point.z);
-    const max = 58;
+    const max = WORLD_RADIUS - 5;
     if (r > max) {
       const scale = max / r;
       moveTo(point.x * scale, point.z * scale);
@@ -270,7 +270,7 @@ function Ground() {
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(16, 16);
+    tex.repeat.set(24, 24);
     return tex;
   }, []);
 
@@ -281,7 +281,7 @@ function Ground() {
       onClick={handleClick}
       receiveShadow
     >
-      <circleGeometry args={[62, 96]} />
+      <circleGeometry args={[WORLD_RADIUS + 5, 96]} />
       <meshStandardMaterial map={gridTexture} roughness={0.95} />
     </mesh>
   );
@@ -523,28 +523,29 @@ export function GameScene() {
   );
 }
 
-// Subtle district ground tints — colored planes overlaid on the base ground
-// so each district has its own ground tone.
+// Subtle district ground tints — colored planes for each city quadrant + suburbs ring.
 function DistrictGroundTints() {
+  const CITY = 60;
+  const SUBURB = WORLD_RADIUS;
+  const quads = [
+    { color: DISTRICTS.downtown.groundColor, x: -CITY / 2, z: -CITY / 2, w: CITY, h: CITY },
+    { color: DISTRICTS.harbor.groundColor, x: CITY / 2, z: -CITY / 2, w: CITY, h: CITY },
+    { color: DISTRICTS.slums.groundColor, x: -CITY / 2, z: CITY / 2, w: CITY, h: CITY },
+    { color: DISTRICTS.industrial.groundColor, x: CITY / 2, z: CITY / 2, w: CITY, h: CITY },
+  ];
   return (
     <>
-      {Object.values(DISTRICTS).map((d) => (
-        <mesh
-          key={d.id}
-          rotation={[-Math.PI / 2, 0, 0]}
-          position={[(d.minX + d.maxX) / 2, 0.015, (d.minZ + d.maxZ) / 2]}
-          receiveShadow
-        >
-          <planeGeometry args={[d.maxX - d.minX, d.maxZ - d.minZ]} />
-          <meshStandardMaterial
-            color={d.groundColor}
-            roughness={1}
-            metalness={0}
-            transparent
-            opacity={0.55}
-          />
+      {quads.map((q, i) => (
+        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[q.x, 0.015, q.z]} receiveShadow>
+          <planeGeometry args={[q.w, q.h]} />
+          <meshStandardMaterial color={q.color} roughness={1} metalness={0} transparent opacity={0.5} />
         </mesh>
       ))}
+      {/* Suburbs ring — a large plane with a hole (visual approximation) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]} receiveShadow>
+        <ringGeometry args={[CITY * 0.85, SUBURB, 64]} />
+        <meshStandardMaterial color={DISTRICTS.suburbs.groundColor} roughness={1} metalness={0} transparent opacity={0.45} />
+      </mesh>
     </>
   );
 }

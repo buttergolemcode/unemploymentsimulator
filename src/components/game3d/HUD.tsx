@@ -304,7 +304,7 @@ export function MiniMap() {
   const nearbyId = usePlayer((s) => s.nearbyBuildingId);
 
   // Map world coords (-60..60) to map coords (0..100)
-  const toMap = (n: number) => ((n + 60) / 120) * 100;
+  const toMap = (n: number) => ((n + 110) / 220) * 100;
 
   return (
     <Card className="p-2 backdrop-blur-md bg-card/90 w-[140px] md:w-[180px]">
