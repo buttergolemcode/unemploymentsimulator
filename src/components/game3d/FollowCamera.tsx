@@ -7,6 +7,7 @@ import { usePlayer } from './playerStore';
 import { useVehicle } from './vehicleStore';
 import { useGame } from '../../lib/game/store';
 import { getDayPhase, getTimeOfDay } from './dayNight';
+import { terrainHeight } from './terrain';
 
 // Camera that switches between first-person and third-person based on player.cameraMode.
 // First-person: camera at player eye height, looks where yaw/pitch point. Pointer-locked.
@@ -32,15 +33,14 @@ export function FollowCamera() {
         // Use the player's yaw as the camera orbit angle (so dragging mouse
         // updates player.yaw which we then use here as camera-yaw offset from car yaw).
         // This way the chase cam follows the car but the player can look around.
-        const camYaw = s.yaw; // player yaw is updated by mouse-drag in PointerLockController
+        const camYaw = s.yaw;
         const distance = 8;
         const height = 3.8;
-        // Camera positioned behind the car based on camYaw (not car yaw):
-        // forward of car at camYaw=0 is -Z, so behind = +Z
+        const groundY = terrainHeight(v.x, v.z);
         const behindX = Math.sin(camYaw) * distance;
         const behindZ = Math.cos(camYaw) * distance;
-        desiredPos.current.set(v.x + behindX, height, v.z + behindZ);
-        targetVec.current.set(v.x, 1.2, v.z);
+        desiredPos.current.set(v.x + behindX, groundY + height, v.z + behindZ);
+        targetVec.current.set(v.x, groundY + 1.2, v.z);
         camera.position.lerp(desiredPos.current, 0.12);
         camera.lookAt(targetVec.current);
         return;
@@ -48,8 +48,8 @@ export function FollowCamera() {
     }
 
     if (s.cameraMode === 'first') {
-      // Eye position
-      const eyeY = 1.6;
+      // Eye position — uses terrain height + eye offset
+      const eyeY = s.groundY + 1.6;
       desiredPos.current.set(s.x, eyeY, s.z);
       const cp = Math.cos(s.pitch);
       lookDir.current.set(
@@ -65,8 +65,8 @@ export function FollowCamera() {
       const height = 4;
       const behindX = Math.sin(s.yaw) * distance;
       const behindZ = Math.cos(s.yaw) * distance;
-      desiredPos.current.set(s.x + behindX, height, s.z + behindZ);
-      targetVec.current.set(s.x, 1.2, s.z);
+      desiredPos.current.set(s.x + behindX, s.groundY + height, s.z + behindZ);
+      targetVec.current.set(s.x, s.groundY + 1.2, s.z);
       camera.position.lerp(desiredPos.current, 0.12);
       camera.lookAt(targetVec.current);
     }

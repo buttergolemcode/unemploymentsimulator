@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useVehicle } from './vehicleStore';
+import { terrainHeight } from './terrain';
 import type { VehicleState } from './vehicleStore';
 
 // A simple low-poly car: body box + cabin box + 4 wheels + 2 headlights.
@@ -13,10 +14,8 @@ export function CarMesh({ vehicle }: { vehicle: VehicleState }) {
 
   useFrame(() => {
     if (!ref.current) return;
-    ref.current.position.set(vehicle.x, 0, vehicle.z);
-    // Yaw + π to make car's local +Z (where headlights are) point in the
-    // "forward" direction used by movement (which is -Z world at yaw=0,
-    // same as player). Without this, the car would drive backwards visually.
+    const groundY = terrainHeight(vehicle.x, vehicle.z);
+    ref.current.position.set(vehicle.x, groundY, vehicle.z);
     ref.current.rotation.y = vehicle.yaw + Math.PI;
   });
 

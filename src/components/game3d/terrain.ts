@@ -1,145 +1,179 @@
-// Procedural terrain heightmap — determines ground height at any (x, z) position.
-// The world has 4 zones with different terrain:
-//   - City Core (r < 80): flat (y=0)
-//   - Suburbs (80-150): gentle rolling hills (0-3m)
-//   - Rural (150-220): hills and valleys (5-20m)
-//   - Borders (220-250): mountains, ocean, forest barriers
-//
-// Uses layered sine/noise functions for natural-looking terrain.
-// All functions are pure (deterministic) — same input always gives same output.
+// Procedural terrain system — heightmap function + mesh generation.
+// The terrain is flat in the city core, gently rolling in suburbs,
+// hilly in rural areas, mountainous at the northern border, and
+// below sea level at the southern ocean.
 
 // ============================================================
-// Height functions
+// Height function
 // ============================================================
+// Deterministic value-noise based on integer hashing.
+// Returns terrain height in meters at world position (x, z).
 
-// Simple deterministic pseudo-noise (no Perlin needed — sine combinations look good enough)
-function noise2D(x: number, z: number, freq: number, seed: number): number {
-  const v = Math.sin(x * freq + seed * 1.7) * Math.cos(z * freq + seed * 2.3) +
-            Math.sin(x * freq * 2.1 + seed * 3.1) * Math.cos(z * freq * 1.7 + seed * 4.7) * 0.5;
-  return v / 1.5; // normalize to ~-1..1
+function hash2(x: number, z: number): number {
+  const h = Math.sin(x * 127.1 + z * 311.7) * 43758.5453;
+  return h - Math.floor(h); // 0..1
 }
 
-// Get terrain height at world position (x, z)
-export function getTerrainHeight(x: number, z: number): number {
+function smoothNoise(x: number, z: number): number {
+  const ix = Math.floor(x);
+  const iz = Math.floor(z);
+  const fx = x - ix;
+  const fz = z - iz;
+  // Smoothstep interpolation
+  const sx = fx * fx * (3 - 2 * fx);
+  const sz = fz * fz * (3 - 2 * fz);
+  const n00 = hash2(ix, iz);
+  const n10 = hash2(ix + 1, iz);
+  const n01 = hash2(ix, iz + 1);
+  const n11 = hash2(ix + 1, iz + 1);
+  return n00 * (1 - sx) * (1 - sz) + n10 * sx * (1 - sz) + n01 * (1 - sx) * sz + n11 * sx * sz;
+}
+
+function octave(x: number, z: number, freq: number, amp: number): number {
+  return smoothNoise(x * freq, z * freq) * amp;
+}
+
+// Multi-octave fractal noise (0..1 range)
+function fractalNoise(x: number, z: number, octaves: number): number {
+  let value = 0;
+  let amp = 1;
+  let freq = 1;
+  let max = 0;
+  for (let i = 0; i < octaves; i++) {
+    value += smoothNoise(x * freq * 0.01, z * freq * 0.01) * amp;
+    max += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return value / max;
+}
+
+// Main terrain height function. Returns Y in meters.
+// City core (r < 75): flat at 0
+// Suburbs (75 < r < 140): gentle rolling 0-3m
+// Rural (140 < r < 200): hills 5-20m
+// Mountains north (r > 200, z < -100): steep 25-50m
+// Ocean south (r > 200, z > 100): below sea level -2 to -8m
+// Forest edges: moderate hills
+export function terrainHeight(x: number, z: number): number {
   const r = Math.sqrt(x * x + z * z);
 
-  // City core: completely flat
-  if (r < 75) return 0;
+  // City core — perfectly flat
+  if (r < 70) return 0;
 
-  // Transition zone: smooth blend from flat to terrain
-  // 75-85: blend from 0 to suburb terrain
-  if (r < 85) {
-    const t = (r - 75) / 10; // 0..1
-    const suburbH = getSuburbHeight(x, z);
-    return suburbH * t;
+  // Smooth transition zone (70-85): blend from flat to terrain
+  const cityBlend = Math.max(0, Math.min(1, (r - 70) / 15));
+
+  // Base terrain noise
+  let h = 0;
+
+  if (r < 140) {
+    // Suburbs: gentle rolling hills (0-3m)
+    h = fractalNoise(x, z, 1) * 4;
+  } else if (r < 200) {
+    // Rural: hills (5-20m)
+    h = 5 + fractalNoise(x, z, 2) * 15;
+  } else {
+    // Outer regions — depends on direction
+    if (z < -100) {
+      // North: mountains (25-50m)
+      const mountainFactor = Math.max(0, (r - 200) / 50);
+      h = 20 + fractalNoise(x, z, 3) * 30 * Math.min(1, mountainFactor);
+    } else if (z > 100) {
+      // South: ocean (below sea level)
+      h = -2 - Math.max(0, (r - 200) / 20) * 6;
+    } else {
+      // East/West: moderate hills + forest
+      h = 8 + fractalNoise(x, z, 2) * 15;
+    }
   }
 
-  // Suburbs: gentle rolling hills (0-3m)
-  if (r < 150) {
-    return getSuburbHeight(x, z);
-  }
-
-  // Rural: hills and valleys (5-20m)
-  if (r < 220) {
-    return getRuralHeight(x, z);
-  }
-
-  // Borders: depends on direction
-  return getBorderHeight(x, z, r);
-}
-
-function getSuburbHeight(x: number, z: number): number {
-  // Very gentle hills — 0 to 3 meters
-  const h1 = noise2D(x, z, 0.01, 1) * 1.5;
-  const h2 = noise2D(x, z, 0.03, 2) * 0.5;
-  return Math.max(0, h1 + h2);
-}
-
-function getRuralHeight(x: number, z: number): number {
-  // Rolling hills — 5 to 20 meters
-  const h1 = noise2D(x, z, 0.005, 3) * 8;     // large hills
-  const h2 = noise2D(x, z, 0.015, 4) * 3;     // medium bumps
-  const h3 = noise2D(x, z, 0.05, 5) * 0.8;    // small detail
-  return Math.max(0, h1 + h2 + h3 + 5); // offset so valleys are at ~5m, peaks at ~20m
-}
-
-function getBorderHeight(x: number, z: number, r: number): number {
-  // Angle from center (0 = north/+Z, π/2 = east/+X, π = south/-Z, -π/2 = west/-X)
-  const angle = Math.atan2(x, z);
-
-  // NORTH (angle near 0): Mountains — steep climb starting at r=220
-  if (Math.abs(angle) < 0.7) {
-    const mountainStart = 220;
-    if (r < mountainStart) return getRuralHeight(x, z);
-    const t = (r - mountainStart) / 30;
-    const mountainH = t * t * 50; // quadratic rise
-    return getRuralHeight(x, z) + mountainH;
-  }
-
-  // SOUTH (angle near π): Ocean — ground drops below sea level
-  if (Math.abs(angle - Math.PI) < 0.7 || Math.abs(angle + Math.PI) < 0.7) {
-    const oceanStart = 215;
-    if (r < oceanStart) return getRuralHeight(x, z);
-    const t = (r - oceanStart) / 35;
-    return getRuralHeight(x, z) - t * 8; // descend into water
-  }
-
-  // EAST (angle near π/2): Highway barrier — gentle rise then wall
-  if (Math.abs(angle - Math.PI / 2) < 0.6) {
-    const wallStart = 225;
-    if (r < wallStart) return getRuralHeight(x, z);
-    const t = (r - wallStart) / 20;
-    return getRuralHeight(x, z) + t * 15; // ramp up to highway barrier
-  }
-
-  // WEST (angle near -π/2): Military zone — flat fenced area
-  if (Math.abs(angle + Math.PI / 2) < 0.6) {
-    return getRuralHeight(x, z); // same as rural, fence is visual
-  }
-
-  // Everything else (corners): forest/dense terrain
-  return getRuralHeight(x, z);
+  // Blend with flat city
+  return h * cityBlend;
 }
 
 // ============================================================
-// Zone classification
+// Terrain mesh generation
 // ============================================================
+// Creates a large plane with vertices displaced by terrainHeight().
+// Resolution is higher near the city and lower far out (for perf).
 
-export type TerrainZone = 'city' | 'suburbs' | 'rural' | 'mountain' | 'ocean' | 'highway_barrier' | 'military' | 'forest';
+export interface TerrainMeshData {
+  geometry: THREE.PlaneGeometry;
+}
 
-export function getZone(x: number, z: number): TerrainZone {
-  const r = Math.sqrt(x * x + z * z);
-  if (r < 75) return 'city';
-  if (r < 150) return 'suburbs';
-  if (r < 220) return 'rural';
+import * as THREE from 'three';
 
-  const angle = Math.atan2(x, z);
-  if (Math.abs(angle) < 0.7) return 'mountain';
-  if (Math.abs(angle - Math.PI) < 0.7 || Math.abs(angle + Math.PI) < 0.7) return 'ocean';
-  if (Math.abs(angle - Math.PI / 2) < 0.6) return 'highway_barrier';
-  if (Math.abs(angle + Math.PI / 2) < 0.6) return 'military';
-  return 'forest';
+export function createTerrainGeometry(size: number, segments: number): THREE.PlaneGeometry {
+  const geo = new THREE.PlaneGeometry(size, size, segments, segments);
+  geo.rotateX(-Math.PI / 2);
+
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const y = terrainHeight(x, z);
+    pos.setY(i, y);
+  }
+  geo.computeVertexNormals();
+  return geo;
 }
 
 // ============================================================
-// Water level
+// Terrain vertex colors — green for grass, gray for rock, sand near water
 // ============================================================
+export function applyTerrainColors(geo: THREE.PlaneGeometry): void {
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  const colors = new Float32Array(pos.count * 3);
+  const grassColor = new THREE.Color('#3a5a2a');
+  const grassDark = new THREE.Color('#2a4a1a');
+  const rockColor = new THREE.Color('#6b5b4a');
+  const sandColor = new THREE.Color('#8a7a5a');
+  const dirtColor = new THREE.Color('#4a3a2a');
+  const cityColor = new THREE.Color('#1a1a1a');
 
-export const SEA_LEVEL = -3; // ocean surface at y=-3
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const y = pos.getY(i);
+    const r = Math.sqrt(x * x + z * z);
 
-export function isUnderwater(x: number, z: number): boolean {
-  return getTerrainHeight(x, z) < SEA_LEVEL;
+    const c = new THREE.Color();
+    if (r < 70) {
+      // City — dark gray
+      c.copy(cityColor);
+    } else if (y < 0) {
+      // Underwater — sand
+      c.copy(sandColor);
+    } else if (y < 1) {
+      // Near water — sand
+      c.lerpColors(sandColor, grassColor, y);
+    } else if (y < 8) {
+      // Low grass
+      c.lerpColors(grassColor, grassDark, Math.random() * 0.3);
+    } else if (y < 20) {
+      // Hills — darker grass + dirt
+      c.lerpColors(grassDark, dirtColor, (y - 8) / 12);
+    } else {
+      // Mountains — rock
+      c.lerpColors(dirtColor, rockColor, Math.min(1, (y - 20) / 15));
+    }
+
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
 
-export function isOcean(x: number, z: number): boolean {
-  return getZone(x, z) === 'ocean';
-}
-
 // ============================================================
-// Terrain mesh generation helper — returns height at grid point
-// Used by the TerrainMesh component in Scene.tsx
+// Water surface
 // ============================================================
+// Simple animated water plane at y = WATER_LEVEL.
+export const WATER_LEVEL = -0.8;
 
-export function terrainHeightAt(x: number, z: number): number {
-  return getTerrainHeight(x, z);
+export function createWaterGeometry(size: number, segments: number): THREE.PlaneGeometry {
+  const geo = new THREE.PlaneGeometry(size, size, segments, segments);
+  geo.rotateX(-Math.PI / 2);
+  return geo;
 }

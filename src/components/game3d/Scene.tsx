@@ -10,6 +10,7 @@ import { DayNightLighting } from './FollowCamera';
 import { NPCLayer } from './NPCs';
 import { Weather } from './Weather';
 import { VehicleLayer } from './Vehicles';
+import { createTerrainGeometry, applyTerrainColors, terrainHeight, WATER_LEVEL, createWaterGeometry } from './terrain';
 import type { BuildingPos, FillerBuilding, StreetSegment } from './layout';
 import type { SchemeId } from '../../lib/game/types';
 
@@ -168,11 +169,12 @@ function PlayerAvatar() {
     ref.current.rotation.y = facingRef.current;
     lastPos.current = { x, z };
 
-    // Bob up and down while walking
+    // Bob up and down while walking, on top of terrain height
+    const baseY = terrainHeight(x, z);
     if (walking) {
-      ref.current.position.y = Math.abs(Math.sin(t * 8)) * 0.15;
+      ref.current.position.y = baseY + Math.abs(Math.sin(t * 8)) * 0.15;
     } else {
-      ref.current.position.y = Math.sin(t * 2) * 0.04;
+      ref.current.position.y = baseY + Math.sin(t * 2) * 0.04;
     }
   });
 
@@ -213,19 +215,17 @@ function PlayerAvatar() {
   );
 }
 
-// ---------- Ground ----------
-function Ground() {
+// ---------- Terrain + Water ----------
+function Terrain() {
   const moveTo = usePlayer((s) => s.moveTo);
   const actionPanelOpen = usePlayer((s) => s.actionPanelOpen);
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     if (actionPanelOpen) return;
-    // In first-person mode, clicks go to the canvas for pointer-lock, not click-to-move
     const cameraMode = usePlayer.getState().cameraMode;
     if (cameraMode === 'first') return;
     e.stopPropagation();
     const point = e.point;
-    // Clamp to world radius
     const r = Math.sqrt(point.x * point.x + point.z * point.z);
     const max = WORLD_RADIUS - 5;
     if (r > max) {
@@ -236,53 +236,54 @@ function Ground() {
     }
   };
 
-  // Grid pattern via shader-ish material — use a simple plane with grid texture
-  const gridTexture = useMemo(() => {
-    const size = 512;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, size, size);
-    // Grid lines
-    ctx.strokeStyle = '#2a2a2a';
-    ctx.lineWidth = 2;
-    const step = size / 16;
-    for (let i = 0; i <= 16; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * step, 0);
-      ctx.lineTo(i * step, size);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, i * step);
-      ctx.lineTo(size, i * step);
-      ctx.stroke();
-    }
-    // Asphalt texture: random dots
-    for (let i = 0; i < 2000; i++) {
-      const x = Math.random() * size;
-      const y = Math.random() * size;
-      const v = Math.random() * 60 + 20;
-      ctx.fillStyle = `rgb(${v},${v},${v})`;
-      ctx.fillRect(x, y, 1, 1);
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(24, 24);
-    return tex;
+  // Build terrain geometry once
+  const terrainGeo = useMemo(() => {
+    const TERRAIN_SIZE = WORLD_RADIUS * 2 + 40;
+    const SEGMENTS = 200; // 200×200 = 40k verts, good balance of detail vs perf
+    const geo = createTerrainGeometry(TERRAIN_SIZE, SEGMENTS);
+    applyTerrainColors(geo);
+    return geo;
   }, []);
 
   return (
     <mesh
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, 0, 0]}
+      geometry={terrainGeo}
       onClick={handleClick}
       receiveShadow
-    >
-      <circleGeometry args={[WORLD_RADIUS + 5, 96]} />
-      <meshStandardMaterial map={gridTexture} roughness={0.95} />
+    />
+  );
+}
+
+// Animated water surface — covers the ocean south + harbor basin
+function WaterSurface() {
+  const waterRef = useRef<THREE.Mesh>(null);
+  const waterGeo = useMemo(() => {
+    return createWaterGeometry(WORLD_RADIUS * 2 + 40, 80);
+  }, []);
+
+  // Animate water vertices with gentle sine waves
+  useFrame((state) => {
+    if (!waterRef.current) return;
+    const t = state.clock.elapsedTime;
+    const pos = waterRef.current.geometry.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      pos.setY(i, Math.sin(x * 0.05 + t) * 0.15 + Math.cos(z * 0.05 + t * 0.7) * 0.1);
+    }
+    pos.needsUpdate = true;
+  });
+
+  return (
+    <mesh ref={waterRef} geometry={waterGeo} position={[0, WATER_LEVEL, 0]}>
+      <meshStandardMaterial
+        color="#1a4a6a"
+        transparent
+        opacity={0.75}
+        roughness={0.2}
+        metalness={0.3}
+        side={THREE.DoubleSide}
+      />
     </mesh>
   );
 }
@@ -463,7 +464,11 @@ export function GameScene() {
       <DayNightLighting />
 
       {/* Ground — larger to fit open world */}
-      <Ground />
+      {/* Terrain — heightmap-based ground with hills, mountains, and ocean */}
+      <Terrain />
+
+      {/* Water surface — ocean + harbor basin */}
+      <WaterSurface />
 
       {/* Streets */}
       {STREETS.map((s, i) => (

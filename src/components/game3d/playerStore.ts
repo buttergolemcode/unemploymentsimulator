@@ -1,6 +1,7 @@
 // Player movement store — separate from game logic state
 import { create } from 'zustand';
 import { PLAYER_SPAWN, INTERACT_DISTANCE, nearestBuilding, BUILDINGS, FILLER_BUILDINGS, WORLD_RADIUS } from './layout';
+import { terrainHeight } from './terrain';
 import type { SchemeId } from '../../lib/game/types';
 import { setActionPanelOpen } from '../../lib/game/store';
 
@@ -102,6 +103,8 @@ interface PlayerStore {
   setFpsInput: (input: { forward: number; right: number }) => void;
   // Walking flag set by FPS controller when keys are pressed
   fpsMoving: boolean;
+  // Current ground height (from terrain) — updated each tick
+  groundY: number;
 }
 
 const SPEED = 7;
@@ -125,6 +128,7 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
   pointerLocked: false,
   fpsInput: { forward: 0, right: 0 },
   fpsMoving: false,
+  groundY: 0,
 
   setActionPanel: (open) => {
     setActionPanelOpen(open);
@@ -196,7 +200,7 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
         if (r <= WORLD_MAX) {
           const near = nearestBuilding(result.x, result.z);
           const newId = near && near.distance < INTERACT_DISTANCE ? near.building.id : null;
-          set({ x: result.x, z: result.z, nearbyBuildingId: newId });
+          set({ x: result.x, z: result.z, nearbyBuildingId: newId, groundY: terrainHeight(result.x, result.z) });
           return true;
         }
       }
@@ -222,7 +226,7 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
       const newId = near && near.distance < INTERACT_DISTANCE ? near.building.id : null;
       // Make the player face the walk direction in third-person mode
       const newYaw = Math.atan2(dx, dz);
-      set({ x: result.x, z: result.z, nearbyBuildingId: newId, yaw: newYaw });
+      set({ x: result.x, z: result.z, nearbyBuildingId: newId, yaw: newYaw, groundY: terrainHeight(result.x, result.z) });
       // If we didn't actually move (collision), stop walking to avoid jittering into a wall
       const moved = Math.abs(result.x - s.x) > 0.001 || Math.abs(result.z - s.z) > 0.001;
       if (!moved) {
@@ -231,12 +235,11 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
       return true;
     }
 
-    // Idle — still update nearby-building state
+    // Idle — still update nearby-building state + ground height
     const near = nearestBuilding(s.x, s.z);
     const newId = near && near.distance < INTERACT_DISTANCE ? near.building.id : null;
-    if (newId !== s.nearbyBuildingId) {
-      set({ nearbyBuildingId: newId });
-    }
+    const gy = terrainHeight(s.x, s.z);
+    set({ nearbyBuildingId: newId, groundY: gy });
     return false;
   },
 

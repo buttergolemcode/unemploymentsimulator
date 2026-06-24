@@ -5,6 +5,7 @@ import type { RefCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { districtAt, isOnSidewalk, ROADS, randomSidewalkPoint } from './layout';
+import { terrainHeight } from './terrain';
 import type { DistrictId } from './layout';
 
 // ============================================================
@@ -159,6 +160,7 @@ export function NPCLayer() {
       grp.rotation.y += diff * Math.min(1, dt * 8);
       grp.position.x = npc.x;
       grp.position.z = npc.z;
+      const groundY = terrainHeight(npc.x, npc.z);
 
       if (npc.kind === 'merchant') continue;
 
@@ -175,7 +177,7 @@ export function NPCLayer() {
         npc.x += (dx / dist) * move;
         npc.z += (dz / dist) * move;
         npc.facing = Math.atan2(dx, dz);
-        grp.position.y = Math.abs(Math.sin(performance.now() * 0.008 + i)) * 0.06;
+        grp.position.y = groundY + Math.abs(Math.sin(performance.now() * 0.008 + i)) * 0.06;
       }
     }
   });
