@@ -101,7 +101,7 @@ jobs:
           prerelease: false
           args: --bundles nsis
 
-      - name: Manually sign the .exe (fallback if tauri-action didn't)
+      - name: Manually sign the .exe
         shell: bash
         run: |
           # Find the built .exe
@@ -112,26 +112,18 @@ jobs:
           fi
           echo "Signing: $EXE"
 
-          # Use tauri signer to create the signature
-          # The TAURI_SIGNING_PRIVATE_KEY env var is set at the job level
-          npx @tauri-apps/cli signer sign -f "$EXE" -o "${EXE}.sig" 2>&1 || true
+          # 'tauri signer sign <FILE>' creates <FILE>.sig automatically next to input.
+          # No -o or -f flags needed — the file path is a positional argument.
+          # TAURI_SIGNING_PRIVATE_KEY + TAURI_SIGNING_PRIVATE_KEY_PASSWORD are set at job level.
+          npx @tauri-apps/cli signer sign "$EXE"
 
           # Verify the .sig was created
           if [ -f "${EXE}.sig" ]; then
-            echo "Successfully created signature: ${EXE}.sig"
+            echo "Successfully created signature!"
             cat "${EXE}.sig"
           else
-            echo "ERROR: Signature file was not created"
-            # Try alternative: use the bundled minisign tool from tauri
-            cargo install tauri-cli --version "^2.0" --locked 2>&1 | tail -3
-            cargo tauri signer sign -f "$EXE" -o "${EXE}.sig" 2>&1 || true
-            if [ -f "${EXE}.sig" ]; then
-              echo "Created signature via cargo tauri:"
-              cat "${EXE}.sig"
-            else
-              echo "FATAL: Could not create signature. Updates will not work."
-              exit 1
-            fi
+            echo "FATAL: Signature file was not created"
+            exit 1
           fi
 
       # ---------- Find the .exe + .sig ----------
