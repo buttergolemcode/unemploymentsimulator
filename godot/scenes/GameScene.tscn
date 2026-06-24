@@ -1,20 +1,42 @@
-[gd_scene load_steps=4 format=3 uid="uid://game_scene_001"]
+[gd_scene load_steps=8 format=3 uid="uid://bgamescene01"]
 
-[ext_resource type="Script" path="res://scripts/GameScene.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/PlayerController.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/HUD.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/GameScene.gd" id="1_scene"]
+[ext_resource type="Script" path="res://scripts/PlayerController.gd" id="2_player"]
+[ext_resource type="Script" path="res://scripts/HUD.gd" id="3_hud"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
+size = Vector3(500, 1, 500)
+
+[sub_resource type="StandardMaterial3D" id="Mat_ground"]
+albedo_color = Color(0.1, 0.1, 0.12, 1)
+roughness = 0.95
+
+[sub_resource type="Environment" id="Env_main"]
+background_mode = 1
+background_color = Color(0.04, 0.05, 0.1, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.3, 0.3, 0.4, 1)
+ambient_light_energy = 0.4
+fog_enabled = true
+fog_light_color = Color(0.04, 0.05, 0.1, 1)
+fog_density = 0.003
+tonemap_mode = 2
 
 [node name="GameScene" type="Node3D"]
-script = ExtResource("1")
+script = ExtResource("1_scene")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env_main")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.866, 0.5, 0, -0.5, 0.866, 10, 30, 10)
 light_energy = 1.2
 shadow_enabled = true
 directional_shadow_max_distance = 80.0
-
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Environment_001")
 
 [node name="Ground" type="StaticBody3D" parent="."]
 collision_layer = 1
@@ -23,14 +45,14 @@ collision_mask = 1
 [node name="GroundMesh" type="CSGBox3D" parent="Ground"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 size = Vector3(500, 1, 500)
-material = SubResource("StandardMaterial3D_ground")
+material = SubResource("Mat_ground")
 
 [node name="GroundCollision" type="CollisionShape3D" parent="Ground"]
 shape = SubResource("BoxShape3D_ground")
 
 [node name="Player" type="CharacterBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 6)
-script = ExtResource("2")
+script = ExtResource("2_player")
 collision_layer = 2
 collision_mask = 1
 
@@ -47,7 +69,7 @@ far = 600.0
 target_position = Vector3(0, 0, -5)
 
 [node name="HUD" type="CanvasLayer" parent="."]
-script = ExtResource("3")
+script = ExtResource("3_hud")
 
 [node name="MarginContainer" type="MarginContainer" parent="HUD"]
 anchors_preset = 15
@@ -65,70 +87,61 @@ layout_mode = 2
 
 [node name="StatsBar" type="HBoxContainer" parent="HUD/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_constants/separation = 20
-
-[node name="HBoxContainer" type="HBoxContainer" parent="HUD/MarginContainer/VBoxContainer/StatsBar"]
-layout_mode = 2
 theme_override_constants/separation = 30
 
-[node name="MoneyLabel" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar/HBoxContainer"]
+[node name="MoneyLabel" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 text = "Cash:"
 
-[node name="MoneyValue" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar/HBoxContainer"]
+[node name="MoneyValue" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 text = "$500"
 
-[node name="HeatLabel" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar/HBoxContainer"]
+[node name="HeatLabel" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 text = "Heat:"
 
-[node name="HeatValue" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar/HBoxContainer"]
+[node name="HeatValue" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 text = "0/100"
 
-[node name="DayLabel" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar/HBoxContainer"]
+[node name="DayLabel" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 text = "Day:"
 
-[node name="DayValue" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar/HBoxContainer"]
+[node name="DayValue" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 text = "1"
 
-[node name="ActionsLabel" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar/HBoxContainer"]
+[node name="ActionsLabel" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 text = "Actions:"
 
-[node name="ActionsValue" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar/HBoxContainer"]
+[node name="ActionsValue" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 text = "3/3"
 
-[node name="RepLabel" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar/HBoxContainer"]
+[node name="RepLabel" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 text = "Rep:"
 
-[node name="RepValue" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar/HBoxContainer"]
+[node name="RepValue" type="Label" parent="HUD/MarginContainer/VBoxContainer/StatsBar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 text = "0/100"
 
 [node name="VBoxContainer2" type="VBoxContainer" parent="HUD/MarginContainer"]
 layout_mode = 2
 size_flags_vertical = 8
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -200.0
 
 [node name="ScrollContainer" type="ScrollContainer" parent="HUD/MarginContainer/VBoxContainer2"]
 layout_mode = 2

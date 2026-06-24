@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://end_screen_001"]
+[gd_scene load_steps=2 format=3 uid="uid://bendscreen01"]
 
-[ext_resource type="Script" path="res://scripts/EndScreen.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/EndScreen.gd" id="1_end"]
 
 [node name="EndScreen" type="Control"]
 layout_mode = 3
@@ -9,7 +9,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1")
+script = ExtResource("1_end")
 
 [node name="ColorRect" type="ColorRect" parent="."]
 layout_mode = 1
@@ -36,13 +36,13 @@ alignment = 1
 
 [node name="Title" type="Label" parent="VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 48
+theme_override_font_sizes/font_size = 36
 text = "GAME OVER"
 horizontal_alignment = 1
 
 [node name="Flavor" type="Label" parent="VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 14
 text = ""
 horizontal_alignment = 1
 autowrap_mode = 3
@@ -53,7 +53,7 @@ custom_minimum_size = Vector2(0, 20)
 
 [node name="Stats" type="Label" parent="VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 14
 text = ""
 horizontal_alignment = 1
 

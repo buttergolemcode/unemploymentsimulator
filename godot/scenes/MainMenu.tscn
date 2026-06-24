@@ -1,6 +1,6 @@
-[gd_scene load_steps=3 format=3 uid="uid://main_menu_001"]
+[gd_scene load_steps=3 format=3 uid="uid://bmainmenu01"]
 
-[ext_resource type="Script" path="res://scripts/MainMenu.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/MainMenu.gd" id="1_menu"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -9,7 +9,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1")
+script = ExtResource("1_menu")
 
 [node name="ColorRect" type="ColorRect" parent="."]
 layout_mode = 1
@@ -38,13 +38,13 @@ alignment = 1
 
 [node name="Title" type="Label" parent="VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 48
+theme_override_font_sizes/font_size = 36
 text = "UNEMPLOYMENT SIMULATOR 3D"
 horizontal_alignment = 1
 
 [node name="Subtitle" type="Label" parent="VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 14
 text = "Make $1M without getting a job. Avoid McDonald's."
 horizontal_alignment = 1
 
@@ -64,10 +64,14 @@ custom_minimum_size = Vector2(0, 50)
 theme_override_font_sizes/font_size = 20
 text = "Quit"
 
+[node name="Spacer2" type="Control" parent="VBoxContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 20)
+
 [node name="Controls" type="Label" parent="VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "WASD — Walk/Drive | Mouse — Look | E — Enter Building | F — Enter/Exit Car | V — Toggle Camera | B — End Day"
+theme_override_font_sizes/font_size = 11
+text = "WASD = Walk | Mouse = Look | E = Enter Building | V = Camera | B = End Day"
 horizontal_alignment = 1
 
 [connection signal="pressed" from="VBoxContainer/StartButton" to="." method="_on_start_button_pressed"]
