@@ -1,0 +1,21 @@
+# Godot 4 .gitignore
+
+# Godot specific
+.godot/
+*.tmp
+
+# Export builds (don't commit .exe, .zip etc.)
+/export/
+*.exe
+*.zip
+*.pck
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
