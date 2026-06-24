@@ -17,7 +17,6 @@ pub fn run() {
 
             // ====== AUTO-UPDATE CHECK FROM RUST SIDE ======
             // This runs BEFORE the frontend loads, so it works even if JS fails.
-            // No dependency on window.__TAURI__ or dynamic imports.
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 println!("[Updater] Starting update check from Rust...");
@@ -36,7 +35,7 @@ pub fn run() {
                         update
                     }
                     Ok(None) => {
-                        println!("[Updater] No update available — already on latest version");
+                        println!("[Updater] No update available");
                         return;
                     }
                     Err(e) => {
@@ -54,7 +53,7 @@ pub fn run() {
                     ))
                     .title("Update Available")
                     .kind(tauri_plugin_dialog::MessageDialogKind::Info)
-                    .buttons(tauri_plugin_dialog::DialogButtons::OkCancel)
+                    .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel)
                     .blocking_show();
 
                 if !should_update {
@@ -63,10 +62,14 @@ pub fn run() {
                 }
 
                 println!("[Updater] Downloading update...");
-                match update.download_and_install(|_event| {}, || {}).await {
+                // download_and_install takes two closures: progress callback + on_download_complete
+                match update.download_and_install(
+                    |_progress| {},
+                    || {},
+                ).await {
                     Ok(()) => {
-                        println!("[Updater] Update installed successfully — restarting app");
-                        // download_and_install already restarts the app on Windows
+                        println!("[Updater] Update installed successfully");
+                        // On Windows, the installer restarts the app automatically
                     }
                     Err(e) => {
                         eprintln!("[Updater] Failed to install update: {}", e);
