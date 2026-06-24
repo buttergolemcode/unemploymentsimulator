@@ -59,32 +59,32 @@ export function terrainHeight(x: number, z: number): number {
   const r = Math.sqrt(x * x + z * z);
 
   // City core — perfectly flat
-  if (r < 70) return 0;
+  if (r < 80) return 0;
 
-  // Smooth transition zone (70-85): blend from flat to terrain
-  const cityBlend = Math.max(0, Math.min(1, (r - 70) / 15));
+  // Smooth transition zone (80-100): blend from flat to terrain
+  const cityBlend = Math.max(0, Math.min(1, (r - 80) / 20));
 
   // Base terrain noise
   let h = 0;
 
-  if (r < 140) {
-    // Suburbs: gentle rolling hills (0-3m)
+  if (r < 150) {
+    // Suburbs: gentle rolling hills (0-4m)
     h = fractalNoise(x, z, 1) * 4;
-  } else if (r < 200) {
+  } else if (r < 220) {
     // Rural: hills (5-20m)
     h = 5 + fractalNoise(x, z, 2) * 15;
   } else {
     // Outer regions — depends on direction
-    if (z < -100) {
-      // North: mountains (25-50m)
-      const mountainFactor = Math.max(0, (r - 200) / 50);
-      h = 20 + fractalNoise(x, z, 3) * 30 * Math.min(1, mountainFactor);
-    } else if (z > 100) {
+    if (z < -120) {
+      // North: mountains (25-55m)
+      const mountainFactor = Math.max(0, (r - 220) / 30);
+      h = 25 + fractalNoise(x, z, 3) * 30 * Math.min(1, mountainFactor);
+    } else if (z > 120) {
       // South: ocean (below sea level)
-      h = -2 - Math.max(0, (r - 200) / 20) * 6;
+      h = -2 - Math.max(0, (r - 220) / 20) * 8;
     } else {
       // East/West: moderate hills + forest
-      h = 8 + fractalNoise(x, z, 2) * 15;
+      h = 10 + fractalNoise(x, z, 2) * 15;
     }
   }
 

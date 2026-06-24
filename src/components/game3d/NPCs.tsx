@@ -31,6 +31,7 @@ const PEDESTRIAN_PALETTE: Record<DistrictId, string[]> = {
   slums: ['#7c2d12', '#9a3412', '#451a03', '#78350f', '#1c1917'],
   industrial: ['#3f3f46', '#525252', '#27272a', '#18181b'],
   suburbs: ['#525252', '#737373', '#404040', '#525252'],
+  rural: ['#6b5b4a', '#7a6a5a', '#5a4a3a', '#4a3a2a'],
 };
 
 const MERCHANT_PALETTE: Record<DistrictId, string> = {
@@ -39,6 +40,7 @@ const MERCHANT_PALETTE: Record<DistrictId, string> = {
   slums: '#b91c1c',
   industrial: '#d97706',
   suburbs: '#0891b2',
+  rural: '#8b4513',
 };
 
 // Merchant positions — near scheme building entrances, on sidewalks
@@ -59,16 +61,17 @@ const PEDESTRIAN_DENSITY: Record<DistrictId, number> = {
   slums: 10,
   industrial: 5,
   suburbs: 4,
+  rural: 2,
 };
 
 // Find a random sidewalk point within a district
 function randomSidewalkInDistrict(d: DistrictId): [number, number] {
-  // Try roads within the district's area
-  const bounds = d === 'downtown' ? { minX: -60, maxX: 0, minZ: -60, maxZ: 0 } :
-    d === 'harbor' ? { minX: 0, maxX: 60, minZ: -60, maxZ: 0 } :
-    d === 'slums' ? { minX: -60, maxX: 0, minZ: 0, maxZ: 60 } :
-    d === 'industrial' ? { minX: 0, maxX: 60, minZ: 0, maxZ: 60 } :
-    { minX: -100, maxX: 100, minZ: -100, maxZ: 100 };
+  const bounds = d === 'downtown' ? { minX: -80, maxX: 0, minZ: -80, maxZ: 0 } :
+    d === 'harbor' ? { minX: 0, maxX: 80, minZ: -80, maxZ: 0 } :
+    d === 'slums' ? { minX: -80, maxX: 0, minZ: 0, maxZ: 80 } :
+    d === 'industrial' ? { minX: 0, maxX: 80, minZ: 0, maxZ: 80 } :
+    d === 'suburbs' ? { minX: -150, maxX: 150, minZ: -150, maxZ: 150 } :
+    { minX: -220, maxX: 220, minZ: -220, maxZ: 220 };
 
   for (let i = 0; i < 30; i++) {
     const x = bounds.minX + Math.random() * (bounds.maxX - bounds.minX);

@@ -534,7 +534,7 @@ export function GameScene() {
 
 // Subtle district ground tints — colored planes for each city quadrant + suburbs ring.
 function DistrictGroundTints() {
-  const CITY = 60;
+  const CITY = 80;
   const SUBURB = WORLD_RADIUS;
   const quads = [
     { color: DISTRICTS.downtown.groundColor, x: -CITY / 2, z: -CITY / 2, w: CITY, h: CITY },

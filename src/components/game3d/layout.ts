@@ -5,13 +5,16 @@ import type { SchemeId } from '../../lib/game/types';
 // ============================================================
 // World dimensions
 // ============================================================
-// City core: -60..60 (120×120m)
-// Suburbs ring: 60..100 (extends outward)
-// Total world radius: 110
+// City core: -80..80 (160×160m) — 4 districts
+// Suburbs ring: 80..150 — residential
+// Rural: 150..220 — hills, forest, fields
+// Borders: 220..250 — mountains, ocean, forest, barricades
+// Total world radius: 250
 
-export const CITY_RADIUS = 60;
-export const SUBURB_RADIUS = 100;
-export const WORLD_RADIUS = 110;
+export const CITY_RADIUS = 80;
+export const SUBURB_RADIUS = 150;
+export const RURAL_RADIUS = 220;
+export const WORLD_RADIUS = 250;
 export const PLAYER_SPAWN: [number, number] = [0, 6];
 export const INTERACT_DISTANCE = 6;
 
@@ -19,7 +22,7 @@ export const INTERACT_DISTANCE = 6;
 // Districts
 // ============================================================
 
-export type DistrictId = 'downtown' | 'harbor' | 'slums' | 'industrial' | 'suburbs';
+export type DistrictId = 'downtown' | 'harbor' | 'slums' | 'industrial' | 'suburbs' | 'rural';
 
 export interface District {
   id: DistrictId;
@@ -70,11 +73,19 @@ export const DISTRICTS: Record<DistrictId, District> = {
     windowLitChance: 0.4, groundColor: '#1a2a1a',
     lightTint: '#a3e635', lampDensity: 0.4,
   },
+  rural: {
+    id: 'rural', name: 'Countryside', emoji: '🌾',
+    palette: ['#6b5b4a', '#7a6a5a', '#5a4a3a'],
+    heightMin: 3, heightMax: 6,
+    windowLitChance: 0.2, groundColor: '#2a3a1a',
+    lightTint: '#fbbf24', lampDensity: 0.1,
+  },
 };
 
-// District lookup: 4 city quadrants + suburbs ring outside city radius
+// District lookup: 4 city quadrants + suburbs + rural
 export function districtAt(x: number, z: number): District {
   const r = Math.sqrt(x * x + z * z);
+  if (r > RURAL_RADIUS) return DISTRICTS.rural;
   if (r > CITY_RADIUS) return DISTRICTS.suburbs;
   if (x < 0 && z < 0) return DISTRICTS.downtown;
   if (x >= 0 && z < 0) return DISTRICTS.harbor;
@@ -111,38 +122,43 @@ export function roadClearance(road: Road): number {
 
 function generateRoads(): Road[] {
   const roads: Road[] = [];
-  const MAIN_HALF = 8;       // 16m wide main roads (2 lanes each direction + parking)
-  const SIDE_HALF = 5.5;     // 11m wide side roads (1 lane each direction)
-  const SW = 3;              // 3m sidewalks on each side
+  const MAIN_HALF = 8;       // 16m wide main roads
+  const SIDE_HALF = 5.5;     // 11m wide side roads
+  const SW = 3;              // 3m sidewalks
+  const COUNTRY_HALF = 4;   // 8m wide country roads (no sidewalk)
 
-  // === City core roads (within ±60) ===
-  // Main cross axes (district boundaries)
-  roads.push({ axis: 'x', pos: 0, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 220, isMain: true });
-  roads.push({ axis: 'z', pos: 0, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 220, isMain: true });
+  // === City core roads (within ±80) ===
+  // Main cross axes (district boundaries) — extend through city + into suburbs
+  roads.push({ axis: 'x', pos: 0, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 320, isMain: true });
+  roads.push({ axis: 'z', pos: 0, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 320, isMain: true });
 
-  // City ring road at radius ~58
-  roads.push({ axis: 'x', pos: 58, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 130, isMain: true });
-  roads.push({ axis: 'x', pos: -58, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 130, isMain: true });
-  roads.push({ axis: 'z', pos: 58, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 130, isMain: true });
-  roads.push({ axis: 'z', pos: -58, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 130, isMain: true });
+  // City ring road at ±78
+  roads.push({ axis: 'x', pos: 78, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 170, isMain: true });
+  roads.push({ axis: 'x', pos: -78, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 170, isMain: true });
+  roads.push({ axis: 'z', pos: 78, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 170, isMain: true });
+  roads.push({ axis: 'z', pos: -78, asphaltHalf: MAIN_HALF, sidewalkWidth: SW, length: 170, isMain: true });
 
-  // Internal district streets — every 20m
-  for (let p = -40; p <= 40; p += 20) {
-    if (p === 0) continue; // skip main axis
-    roads.push({ axis: 'x', pos: p, asphaltHalf: SIDE_HALF, sidewalkWidth: SW, length: 120, isMain: false });
-    roads.push({ axis: 'z', pos: p, asphaltHalf: SIDE_HALF, sidewalkWidth: SW, length: 120, isMain: false });
+  // Internal district streets — every 20m within city
+  for (let p = -60; p <= 60; p += 20) {
+    if (p === 0) continue;
+    roads.push({ axis: 'x', pos: p, asphaltHalf: SIDE_HALF, sidewalkWidth: SW, length: 160, isMain: false });
+    roads.push({ axis: 'z', pos: p, asphaltHalf: SIDE_HALF, sidewalkWidth: SW, length: 160, isMain: false });
   }
 
-  // === Suburb roads (60..100 ring) ===
-  // Grid of smaller roads in the suburbs
-  for (let p = -100; p <= 100; p += 25) {
-    if (Math.abs(p) <= 58) continue; // skip city core (already has roads there)
-    roads.push({ axis: 'x', pos: p, asphaltHalf: SIDE_HALF, sidewalkWidth: 2.5, length: 220, isMain: false });
-    roads.push({ axis: 'z', pos: p, asphaltHalf: SIDE_HALF, sidewalkWidth: 2.5, length: 220, isMain: false });
+  // === Suburb roads (80..150) — wider grid, narrower streets ===
+  for (let p = -140; p <= 140; p += 30) {
+    if (Math.abs(p) <= 78) continue; // skip city core
+    roads.push({ axis: 'x', pos: p, asphaltHalf: SIDE_HALF, sidewalkWidth: 2, length: 300, isMain: false });
+    roads.push({ axis: 'z', pos: p, asphaltHalf: SIDE_HALF, sidewalkWidth: 2, length: 300, isMain: false });
   }
 
-  // Highway connecting city to suburbs (4 cardinal directions)
-  roads.push({ axis: 'x', pos: 0, asphaltHalf: MAIN_HALF, sidewalkWidth: 1, length: 220, isMain: true });
+  // === Rural roads (150..220) — country lanes, no sidewalk ===
+  // A few winding country roads (simplified as straight segments)
+  for (let p = -200; p <= 200; p += 50) {
+    if (Math.abs(p) <= 140) continue;
+    roads.push({ axis: 'x', pos: p, asphaltHalf: COUNTRY_HALF, sidewalkWidth: 0, length: 440, isMain: false });
+    roads.push({ axis: 'z', pos: p, asphaltHalf: COUNTRY_HALF, sidewalkWidth: 0, length: 440, isMain: false });
+  }
 
   return roads;
 }
@@ -206,17 +222,17 @@ export interface BuildingPos {
 
 export const BUILDINGS: BuildingPos[] = [
   // Downtown (NW) — tall corporate
-  { id: 'trading', name: 'Trading Floor', emoji: '📈', x: -12, z: -42, width: 12, depth: 10, height: 36, color: '#22d3ee', accentColor: '#0891b2', district: 'downtown' },
-  { id: 'wirefraud', name: 'Corporate Tower', emoji: '💸', x: -38, z: -22, width: 16, depth: 14, height: 72, color: '#64748b', accentColor: '#334155', district: 'downtown' },
-  { id: 'taxfraud', name: 'Accountant Office', emoji: '🧾', x: -22, z: -12, width: 10, depth: 9, height: 21, color: '#eab308', accentColor: '#a16207', district: 'downtown' },
-  // Harbor (NE)
-  { id: 'drugs', name: 'Trap House', emoji: '💊', x: 28, z: -38, width: 9, depth: 8, height: 9, color: '#a855f7', accentColor: '#7e22ce', district: 'harbor' },
+  { id: 'trading', name: 'Trading Floor', emoji: '📈', x: -18, z: -55, width: 14, depth: 12, height: 42, color: '#22d3ee', accentColor: '#0891b2', district: 'downtown' },
+  { id: 'wirefraud', name: 'Corporate Tower', emoji: '💸', x: -50, z: -30, width: 18, depth: 16, height: 80, color: '#64748b', accentColor: '#334155', district: 'downtown' },
+  { id: 'taxfraud', name: 'Accountant Office', emoji: '🧾', x: -30, z: -18, width: 12, depth: 10, height: 24, color: '#eab308', accentColor: '#a16207', district: 'downtown' },
+  // Harbor (NE) — near water
+  { id: 'drugs', name: 'Trap House', emoji: '💊', x: 38, z: -50, width: 10, depth: 9, height: 9, color: '#a855f7', accentColor: '#7e22ce', district: 'harbor' },
   // Slums (SW)
-  { id: 'scam', name: 'Internet Cafe', emoji: '🎣', x: -28, z: 22, width: 8, depth: 7, height: 7, color: '#ec4899', accentColor: '#be185d', district: 'slums' },
-  { id: 'robbery', name: 'Corner Store', emoji: '🔫', x: -18, z: 38, width: 7, depth: 7, height: 5, color: '#ef4444', accentColor: '#b91c1c', district: 'slums' },
+  { id: 'scam', name: 'Internet Cafe', emoji: '🎣', x: -38, z: 30, width: 9, depth: 8, height: 7, color: '#ec4899', accentColor: '#be185d', district: 'slums' },
+  { id: 'robbery', name: 'Corner Store', emoji: '🔫', x: -22, z: 50, width: 8, depth: 8, height: 5, color: '#ef4444', accentColor: '#b91c1c', district: 'slums' },
   // Industrial (SE)
-  { id: 'ecom', name: 'E-Com Warehouse', emoji: '📦', x: 22, z: 28, width: 14, depth: 12, height: 11, color: '#4ade80', accentColor: '#16a34a', district: 'industrial' },
-  { id: 'gambling', name: 'Casino', emoji: '🎰', x: 42, z: 18, width: 14, depth: 12, height: 14, color: '#f59e0b', accentColor: '#d97706', district: 'industrial' },
+  { id: 'ecom', name: 'E-Com Warehouse', emoji: '📦', x: 30, z: 38, width: 16, depth: 14, height: 11, color: '#4ade80', accentColor: '#16a34a', district: 'industrial' },
+  { id: 'gambling', name: 'Casino', emoji: '🎰', x: 55, z: 22, width: 16, depth: 14, height: 14, color: '#f59e0b', accentColor: '#d97706', district: 'industrial' },
 ];
 
 // ============================================================
@@ -239,8 +255,8 @@ function hashRand(gx: number, gz: number, salt: number): number {
 
 function generateFillerBuildings(): FillerBuilding[] {
   const out: FillerBuilding[] = [];
-  const GRID = 20;     // 20m grid cells
-  const HALF = 100;    // extend into suburbs
+  const GRID = 20;
+  const HALF = 220;  // extend into rural area
 
   for (let gx = -HALF; gx <= HALF; gx += GRID) {
     for (let gz = -HALF; gz <= HALF; gz += GRID) {
@@ -251,9 +267,9 @@ function generateFillerBuildings(): FillerBuilding[] {
       // Skip spawn plaza
       if (r < 18) continue;
       // Skip if outside world
-      if (r > 105) continue;
+      if (r > 235) continue;
 
-      // Skip if on a road (building zone check)
+      // Skip if on a road
       if (isOnRoad(cx, cz)) continue;
 
       // Skip if too close to a scheme building
@@ -265,17 +281,33 @@ function generateFillerBuildings(): FillerBuilding[] {
       }
       if (tooClose) continue;
 
-      // Leave gaps (parks, parking lots)
-      if (hashRand(gx, gz, 99) < 0.25) continue;
-
+      // Leave gaps — more gaps in suburbs/rural
       const d = districtAt(cx, cz);
-      const w = 8 + hashRand(gx, gz, 1) * 6;
-      const dep = 7 + hashRand(gx, gz, 2) * 5;
-      const h = d.heightMin + hashRand(gx, gz, 3) * (d.heightMax - d.heightMin);
+      const gapChance = d.id === 'suburbs' ? 0.4 : d.id === 'rural' ? 0.7 : 0.25;
+      if (hashRand(gx, gz, 99) < gapChance) continue;
 
-      // Offset within cell — but verify the offset position is still buildable
+      // Building dimensions based on district
+      let w, dep, h;
+      if (d.id === 'rural') {
+        // Rural: small farmhouses / barns
+        w = 5 + hashRand(gx, gz, 1) * 3;
+        dep = 4 + hashRand(gx, gz, 2) * 3;
+        h = 3 + hashRand(gx, gz, 3) * 3;
+      } else if (d.id === 'suburbs') {
+        // Suburbs: medium residential
+        w = 7 + hashRand(gx, gz, 1) * 4;
+        dep = 6 + hashRand(gx, gz, 2) * 3;
+        h = d.heightMin + hashRand(gx, gz, 3) * (d.heightMax - d.heightMin);
+      } else {
+        // City: bigger buildings
+        w = 8 + hashRand(gx, gz, 1) * 6;
+        dep = 7 + hashRand(gx, gz, 2) * 5;
+        h = d.heightMin + hashRand(gx, gz, 3) * (d.heightMax - d.heightMin);
+      }
+
+      // Offset within cell
       const margin = 2;
-      const maxOff = (GRID - w - margin * 2) / 2;
+      const maxOff = Math.max(0, (GRID - w - margin * 2) / 2);
       const ox = (hashRand(gx, gz, 4) - 0.5) * maxOff;
       const oz = (hashRand(gx, gz, 5) - 0.5) * maxOff;
       const fx = cx + ox;

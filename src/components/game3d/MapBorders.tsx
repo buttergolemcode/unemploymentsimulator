@@ -17,10 +17,10 @@ import { terrainHeight } from './terrain';
 function MountainRange() {
   const mountains = useMemo(() => {
     const out: { x: number; z: number; height: number; radius: number; rot: number }[] = [];
-    // Chain of mountains along the northern border (z = -180 to -220)
-    for (let i = -220; i <= 220; i += 30) {
+    // Chain of mountains along the northern border (z = -220 to -260)
+    for (let i = -260; i <= 260; i += 30) {
       const x = i + (Math.random() - 0.5) * 20;
-      const z = -180 - Math.random() * 40;
+      const z = -220 - Math.random() * 40;
       out.push({
         x,
         z,
@@ -55,16 +55,16 @@ function MountainRange() {
 function DenseForest() {
   const trees = useMemo(() => {
     const out: { x: number; z: number; scale: number; rot: number }[] = [];
-    // NW forest (x: -180 to -250, z: -180 to -50)
+    // NW forest (x: -220 to -270, z: -220 to -50)
     for (let i = 0; i < 120; i++) {
-      const x = -180 - Math.random() * 70;
-      const z = -180 + Math.random() * 130;
+      const x = -220 - Math.random() * 50;
+      const z = -220 + Math.random() * 170;
       out.push({ x, z, scale: 0.8 + Math.random() * 0.6, rot: Math.random() * Math.PI * 2 });
     }
-    // NE forest (x: 180 to 250, z: -180 to -50)
+    // NE forest (x: 220 to 270, z: -220 to -50)
     for (let i = 0; i < 120; i++) {
-      const x = 180 + Math.random() * 70;
-      const z = -180 + Math.random() * 130;
+      const x = 220 + Math.random() * 50;
+      const z = -220 + Math.random() * 170;
       out.push({ x, z, scale: 0.8 + Math.random() * 0.6, rot: Math.random() * Math.PI * 2 });
     }
     return out;
@@ -99,9 +99,9 @@ function DenseForest() {
 
 // ---------- Highway Barricade (East) ----------
 function HighwayBarricade() {
-  const groundY = terrainHeight(200, 0);
+  const groundY = terrainHeight(240, 0);
   return (
-    <group position={[200, groundY, 0]}>
+    <group position={[240, groundY, 0]}>
       {/* Concrete barriers (Jersey barriers) along z-axis */}
       {Array.from({ length: 20 }).map((_, i) => {
         const z = -100 + i * 12;
@@ -132,13 +132,13 @@ function HighwayBarricade() {
 
 // ---------- Military Zone Fence (West) ----------
 function MilitaryFence() {
-  const groundY = terrainHeight(-200, 0);
+  const groundY = terrainHeight(-240, 0);
   const posts = useMemo(() => {
-    return Array.from({ length: 30 }).map((_, i) => -150 + i * 10);
+    return Array.from({ length: 40 }).map((_, i) => -200 + i * 10);
   }, []);
 
   return (
-    <group position={[-200, groundY, 0]}>
+    <group position={[-240, groundY, 0]}>
       {/* Fence posts */}
       {posts.map((z, i) => (
         <mesh key={i} position={[0, 1.5, z]}>
@@ -175,10 +175,10 @@ function MilitaryFence() {
 function RuralTrees() {
   const trees = useMemo(() => {
     const out: { x: number; z: number; scale: number; rot: number }[] = [];
-    // Scattered trees in rural zones (r > 120, not in city)
-    for (let i = 0; i < 60; i++) {
+    // Scattered trees in rural zones (r > 150, not in city)
+    for (let i = 0; i < 80; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const dist = 120 + Math.random() * 80;
+      const dist = 150 + Math.random() * 70;
       const x = Math.cos(angle) * dist;
       const z = Math.sin(angle) * dist;
       // Skip if in ocean (south, z > 100, r > 180)
