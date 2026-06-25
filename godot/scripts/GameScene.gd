@@ -1,5 +1,4 @@
-# GameScene.gd — Main game scene controller
-# Spawns buildings, manages day/night, handles building interaction + events
+# GameScene.gd — Main game scene: builds world, spawns vehicles/NPCs, day/night, weather
 extends Node3D
 
 @onready var directional_light: DirectionalLight3D = $DirectionalLight3D
@@ -8,25 +7,13 @@ extends Node3D
 var elapsed_time: float = 0.0
 const CYCLE_SECONDS: float = 720.0  # 12 min = 24h
 
-# Building positions (matching the web version layout)
-const BUILDING_POSITIONS: Array = [
-	{"id": "trading", "name": "Trading Floor", "emoji": "📈", "x": -18, "z": -55, "w": 14, "d": 12, "h": 42, "color": "#22d3ee"},
-	{"id": "wirefraud", "name": "Corporate Tower", "emoji": "💸", "x": -50, "z": -30, "w": 18, "d": 16, "h": 80, "color": "#64748b"},
-	{"id": "taxfraud", "name": "Accountant Office", "emoji": "🧾", "x": -30, "z": -18, "w": 12, "d": 10, "h": 24, "color": "#eab308"},
-	{"id": "drugs", "name": "Trap House", "emoji": "💊", "x": 38, "z": -50, "w": 10, "d": 9, "h": 9, "color": "#a855f7"},
-	{"id": "scam", "name": "Internet Cafe", "emoji": "🎣", "x": -38, "z": 30, "w": 9, "d": 8, "h": 7, "color": "#ec4899"},
-	{"id": "robbery", "name": "Corner Store", "emoji": "🔫", "x": -22, "z": 50, "w": 8, "d": 8, "h": 5, "color": "#ef4444"},
-	{"id": "ecom", "name": "E-Com Warehouse", "emoji": "📦", "x": 30, "z": 38, "w": 16, "d": 14, "h": 11, "color": "#4ade80"},
-	{"id": "gambling", "name": "Casino", "emoji": "🎰", "x": 55, "z": 22, "w": 16, "d": 14, "h": 14, "color": "#f59e0b"},
-]
-
 var building_panel: Control
 var event_modal: Control
 var nearby_building_id: String = ""
 var nearby_building_node: Node3D = null
 
-func _ready() -> void:
-	# Setup environment
+func _ready():
+	# Environment
 	var env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.04, 0.05, 0.1, 1)
@@ -39,94 +26,126 @@ func _ready() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	world_env.environment = env
 	
-	# Spawn scheme buildings
-	_spawn_buildings()
+	# Build the world (terrain, roads, buildings, borders, lamps)
+	WorldBuilder.build_world(self)
 	
-	# Spawn street lamps
-	_spawn_street_lamps()
+	# Spawn vehicles
+	_spawn_vehicles()
+	
+	# Spawn NPCs
+	_spawn_npcs()
+	
+	# Add weather
+	var weather = preload("res://scripts/Weather.gd").new()
+	add_child(weather)
 	
 	# Create UI overlays
 	_create_ui()
 	
-	# Connect GameManager signals
+	# Connect signals
 	GameManager.phase_changed.connect(_on_phase_changed)
 
-func _create_ui() -> void:
-	# Building action panel
+func _create_ui():
 	building_panel = preload("res://scripts/BuildingActionPanel.gd").new()
 	building_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(building_panel)
 	
-	# Event modal
 	event_modal = preload("res://scripts/EventModal.gd").new()
 	event_modal.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(event_modal)
 
-func _spawn_buildings() -> void:
-	for b in BUILDING_POSITIONS:
-		# Building mesh
-		var mesh = CSGBox3D.new()
-		mesh.size = Vector3(b.w, b.h, b.d)
-		mesh.position = Vector3(b.x, b.h / 2.0, b.z)
-		mesh.material = _make_building_material(b.color)
-		mesh.add_to_group("scheme_building")
-		mesh.set_meta("scheme_id", b.id)
-		mesh.set_meta("scheme_name", b.name)
-		mesh.set_meta("scheme_emoji", b.emoji)
-		add_child(mesh)
+func _spawn_vehicles():
+	for vdata in VehicleData.get_positions():
+		var vehicle = CharacterBody3D.new()
+		vehicle.script = preload("res://scripts/Vehicle.gd")
+		vehicle.car_color = vdata.color
+		vehicle.yaw = vdata.yaw
+		vehicle.global_position = Vector3(vdata.x, 0, vdata.z)
 		
-		# Collision body
-		var body = StaticBody3D.new()
-		body.position = Vector3(b.x, b.h / 2.0, b.z)
-		body.collision_layer = 1
+		# Collision
 		var col = CollisionShape3D.new()
 		var shape = BoxShape3D.new()
-		shape.size = Vector3(b.w, b.h, b.d)
+		shape.size = Vector3(2, 1.5, 4.4)
 		col.shape = shape
-		body.add_child(col)
-		add_child(body)
+		col.position = Vector3(0, 0.75, 0)
+		vehicle.add_child(col)
 		
-		# Floating emoji label (using Label3D)
-		var label = Label3D.new()
-		label.text = "%s %s" % [b.emoji, b.name]
-		label.position = Vector3(b.x, b.h + 2, b.z)
-		label.font_size = 48
-		label.outline_size = 6
-		label.outline_modulate = Color.BLACK
-		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		label.no_depth_test = true
-		add_child(label)
+		# Mesh container
+		var mesh_node = Node3D.new()
+		mesh_node.name = "CarMesh"
+		vehicle.add_child(mesh_node)
+		
+		add_child(vehicle)
 
-func _spawn_street_lamps() -> void:
-	var lamp_positions = [
-		Vector3(-6, 0, -4), Vector3(6, 0, -4), Vector3(-6, 0, 6), Vector3(6, 0, 6),
-		Vector3(-20, 0, -20), Vector3(20, 0, -20), Vector3(-20, 0, 20), Vector3(20, 0, 20),
+func _spawn_npcs():
+	# Merchants near scheme buildings
+	var merchant_positions = [
+		{"x": -8, "z": -38, "color": "#16a34a", "district": "downtown"},
+		{"x": -33, "z": -18, "color": "#16a34a", "district": "downtown"},
+		{"x": -18, "z": -10, "color": "#16a34a", "district": "downtown"},
+		{"x": 25, "z": -35, "color": "#7e22ce", "district": "harbor"},
+		{"x": -25, "z": 20, "color": "#b91c1c", "district": "slums"},
+		{"x": -14, "z": 35, "color": "#b91c1c", "district": "slums"},
+		{"x": 18, "z": 25, "color": "#d97706", "district": "industrial"},
+		{"x": 38, "z": 15, "color": "#d97706", "district": "industrial"},
 	]
-	for pos in lamp_positions:
-		var pole = CSGCylinder3D.new()
-		pole.radius = 0.08
-		pole.height = 4.0
-		pole.position = pos + Vector3(0, 2, 0)
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(0.1, 0.1, 0.1)
-		pole.material = mat
-		add_child(pole)
-		
-		var light = OmniLight3D.new()
-		light.position = pos + Vector3(0, 4, 0)
-		light.light_color = Color(1, 0.95, 0.8)
-		light.light_energy = 2.0
-		light.omni_range = 12.0
-		add_child(light)
+	for mp in merchant_positions:
+		_spawn_npc(mp.x, mp.z, mp.color, mp.district, true)
+	
+	# Pedestrians
+	var ped_configs = [
+		{"district": "downtown", "count": 8, "colors": ["#1e293b", "#0f172a", "#374151", "#4b5563"]},
+		{"district": "harbor", "count": 3, "colors": ["#1c1917", "#292524", "#44403c"]},
+		{"district": "slums", "count": 10, "colors": ["#7c2d12", "#9a3412", "#451a03", "#1c1917"]},
+		{"district": "industrial", "count": 5, "colors": ["#3f3f46", "#525252", "#27272a"]},
+		{"district": "suburbs", "count": 4, "colors": ["#525252", "#737373", "#404040"]},
+		{"district": "rural", "count": 2, "colors": ["#6b5b4a", "#7a6a5a"]},
+	]
+	for config in ped_configs:
+		for i in config.count:
+			var color = config.colors[i % config.colors.size()]
+			_spawn_npc_in_district(config.district, color)
 
-func _make_building_material(color_str: String) -> StandardMaterial3D:
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color.from_string(color_str, Color.GRAY)
-	mat.roughness = 0.6
-	mat.metalness = 0.1
-	return mat
+func _spawn_npc(x: float, z: float, color: String, district: String, is_merchant: bool):
+	var npc = CharacterBody3D.new()
+	npc.script = preload("res://scripts/NPC.gd")
+	npc.npc_color = color
+	npc.district = district
+	npc.is_merchant = is_merchant
+	npc.global_position = Vector3(x, 0, z)
+	
+	var col = CollisionShape3D.new()
+	var shape = CapsuleShape3D.new()
+	shape.radius = 0.3
+	shape.height = 1.5
+	col.shape = shape
+	col.position = Vector3(0, 0.75, 0)
+	npc.add_child(col)
+	
+	var mesh_node = Node3D.new()
+	mesh_node.name = "NPCMesh"
+	npc.add_child(mesh_node)
+	
+	add_child(npc)
 
-func _process(delta: float) -> void:
+func _spawn_npc_in_district(district: String, color: String):
+	var bounds = _get_district_bounds(district)
+	for i in 30:
+		var x = bounds[0] + randf() * (bounds[1] - bounds[0])
+		var z = bounds[2] + randf() * (bounds[3] - bounds[2])
+		_spawn_npc(x, z, color, district, false)
+		return
+
+func _get_district_bounds(d: String) -> Array:
+	match d:
+		"downtown": return [-80, 0, -80, 0]
+		"harbor": return [0, 80, -80, 0]
+		"slums": return [-80, 0, 0, 80]
+		"industrial": return [0, 80, 0, 80]
+		"suburbs": return [-150, 150, -150, 150]
+		_: return [-220, 220, -220, 220]
+
+func _process(delta):
 	elapsed_time += delta
 	
 	# Day/night cycle
@@ -134,7 +153,6 @@ func _process(delta: float) -> void:
 	var sun_angle = (t - 0.25) * TAU
 	directional_light.rotation.x = sun_angle
 	
-	# Sun intensity + color by phase
 	var phase = _get_day_phase(t)
 	match phase:
 		"night":
@@ -154,8 +172,11 @@ func _process(delta: float) -> void:
 	if not GameManager.pending_event.is_empty() and not event_modal.visible:
 		event_modal.show_event(GameManager.pending_event)
 	
-	# Check for nearby building (interaction prompt)
+	# Check nearby building
 	_check_nearby_building()
+	
+	# Check vehicle enter/exit
+	_check_vehicle_interaction()
 
 func _get_day_phase(t: float) -> String:
 	if t < 0.08 or t >= 0.92:
@@ -168,18 +189,18 @@ func _get_day_phase(t: float) -> String:
 		return "dusk"
 	return "night"
 
-func _check_nearby_building() -> void:
+func _check_nearby_building():
 	if GameManager.phase != "playing":
 		return
 	if building_panel.visible:
-		return  # Don't update while panel is open
+		return
 	
 	var player = get_node_or_null("Player")
 	if not player:
 		return
 	
 	var nearest_id = ""
-	var nearest_node: Node3D = null
+	var nearest_node = null
 	var nearest_dist = 999.0
 	
 	for building in get_tree().get_nodes_in_group("scheme_building"):
@@ -195,13 +216,37 @@ func _check_nearby_building() -> void:
 		if nearest_id != "":
 			GameManager.log_message.emit("Press E to enter %s" % nearest_node.get_meta("scheme_name", ""), "info")
 
-func _on_phase_changed(new_phase: String) -> void:
+func _check_vehicle_interaction():
+	if GameManager.phase != "playing":
+		return
+	if building_panel.visible:
+		return
+	
+	var player = get_node_or_null("Player")
+	if not player:
+		return
+	
+	# Check F key for vehicle enter/exit
+	# This is handled in PlayerController but we check for nearby vehicle prompt
+	if player.in_vehicle != null:
+		# Player is in vehicle — exit handled by PlayerController
+		return
+	
+	# Check if near any vehicle for prompt
+	for vehicle in get_tree().get_nodes_in_group("vehicle"):
+		if vehicle.is_driven:
+			continue
+		var dist = player.global_position.distance_to(vehicle.global_position)
+		if dist < 4.0:
+			# Could show "Press F" prompt here
+			pass
+
+func _on_phase_changed(new_phase):
 	if new_phase == "menu":
 		get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 	elif new_phase == "won" or new_phase == "lost":
 		get_tree().change_scene_to_file("res://scenes/EndScreen.tscn")
 
-# Called by PlayerController when E is pressed
-func on_player_interact(scheme_id: String) -> void:
+func on_player_interact(scheme_id):
 	if building_panel and not building_panel.visible:
 		building_panel.show_panel(scheme_id)

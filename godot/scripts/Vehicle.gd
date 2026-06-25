@@ -1,0 +1,155 @@
+# Vehicle.gd — A drivable car
+extends CharacterBody3D
+
+var car_color: String = "#dc2626"
+var yaw: float = 0.0
+var speed: float = 0.0
+var max_speed: float = 22.0
+var max_reverse: float = 8.0
+var accel: float = 8.0
+var brake_force: float = 14.0
+var friction: float = 3.0
+var turn_rate: float = 1.8
+var is_driven: bool = false
+
+@onready var mesh: Node3D = $CarMesh
+
+func _ready():
+	add_to_group("vehicle")
+	_build_mesh()
+	rotation.y = yaw
+
+func _build_mesh():
+	# Body
+	var body = CSGBox3D.new()
+	body.size = Vector3(2, 0.7, 4.4)
+	body.position = Vector3(0, 0.6, 0)
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color.from_string(car_color, Color.GRAY)
+	mat.roughness = 0.4
+	mat.metalness = 0.5
+	body.material = mat
+	mesh.add_child(body)
+	
+	# Cabin
+	var cabin = CSGBox3D.new()
+	cabin.size = Vector3(1.7, 0.6, 2.0)
+	cabin.position = Vector3(0, 1.25, -0.2)
+	cabin.material = mat
+	mesh.add_child(cabin)
+	
+	# Windshield
+	var wind = CSGBox3D.new()
+	wind.size = Vector3(1.6, 0.5, 0.1)
+	wind.position = Vector3(0, 1.25, 0.85)
+	var glass_mat = StandardMaterial3D.new()
+	glass_mat.albedo_color = Color(0.06, 0.09, 0.16, 0.8)
+	glass_mat.roughness = 0.1
+	glass_mat.metalness = 0.9
+	glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	wind.material = glass_mat
+	mesh.add_child(wind)
+	
+	# Wheels
+	for pos in [Vector3(-0.9, 0.35, 1.5), Vector3(0.9, 0.35, 1.5), Vector3(-0.9, 0.35, -1.5), Vector3(0.9, 0.35, -1.5)]:
+		var wheel = CSGCylinder3D.new()
+		wheel.radius = 0.35
+		wheel.height = 0.25
+		wheel.rotation.z = PI / 2
+		wheel.position = pos
+		var wmat = StandardMaterial3D.new()
+		wmat.albedo_color = Color(0.1, 0.1, 0.1)
+		wmat.roughness = 0.9
+		wheel.material = wmat
+		mesh.add_child(wheel)
+	
+	# Headlights
+	for x in [-0.6, 0.6]:
+		var hl = OmniLight3D.new()
+		hl.position = Vector3(x, 0.6, 2.2)
+		hl.light_color = Color(1, 0.95, 0.8)
+		hl.light_energy = 1.5
+		hl.omni_range = 8.0
+		mesh.add_child(hl)
+	
+	# Taillights
+	for x in [-0.6, 0.6]:
+		var tl = OmniLight3D.new()
+		tl.position = Vector3(x, 0.6, -2.2)
+		tl.light_color = Color(1, 0.2, 0.1)
+		tl.light_energy = 0.8
+		tl.omni_range = 4.0
+		mesh.add_child(tl)
+
+func _physics_process(delta):
+	if not is_driven:
+		# Apply friction when parked
+		speed = move_toward(speed, 0, friction * delta)
+		return
+	
+	# Input
+	var throttle = 0.0
+	var steer = 0.0
+	var brake_input = false
+	
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+		throttle += 1.0
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+		throttle -= 1.0
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+		steer -= 1.0
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+		steer += 1.0
+	if Input.is_key_pressed(KEY_SPACE):
+		brake_input = true
+	
+	# Apply throttle
+	if throttle > 0:
+		speed += accel * throttle * delta
+		speed = min(speed, max_speed)
+	elif throttle < 0:
+		speed += -accel * abs(throttle) * delta * 0.6
+		speed = max(speed, -max_reverse)
+	else:
+		if speed > 0:
+			speed = max(0, speed - friction * delta)
+		elif speed < 0:
+			speed = min(0, speed + friction * delta)
+	
+	# Brake
+	if brake_input:
+		var decel = brake_force * delta
+		if speed > 0:
+			speed = max(0, speed - decel)
+		elif speed < 0:
+			speed = min(0, speed + decel)
+	
+	# Steering (scales with speed)
+	var speed_factor = min(1, abs(speed) / 5)
+	var turn = steer * turn_rate * speed_factor * delta
+	if speed < 0:
+		yaw += turn
+	else:
+		yaw -= turn
+	
+	rotation.y = yaw + PI  # +PI because car model faces +Z but movement uses -Z forward
+	
+	# Movement: forward = (-sin(yaw), -cos(yaw)) matching player convention
+	var dx = -sin(yaw) * speed * delta
+	var dz = -cos(yaw) * speed * delta
+	
+	velocity = Vector3(dx, 0, dz)
+	move_and_slide()
+	
+	# Sync player position
+	var player = get_tree().get_first_node_in_group("player")
+	if player:
+		player.global_position = global_position
+		player.yaw = yaw
+
+func enter():
+	is_driven = true
+	visible = true
+
+func exit():
+	is_driven = false
