@@ -15,7 +15,11 @@ var in_vehicle: Node = null
 
 func _ready():
 	add_to_group("player")
-	camera.top_level = true  # detach camera from player transform (Godot 4.7 API)
+	camera.top_level = true  # detach camera from player transform
+	# Explicit floor detection settings (prevents flying bug)
+	motion_mode = CharacterBody3D.MOTION_MODE_GROUNDED
+	floor_snap_length = 0.3
+	floor_max_angle = deg_to_rad(50)
 	_build_mesh()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -169,6 +173,7 @@ func _try_vehicle_enter_exit():
 				in_vehicle = vehicle
 				vehicle.enter()
 				yaw = vehicle.yaw
+				velocity = Vector3.ZERO  # reset velocity to prevent flying after exit
 				visible = false
 				GameManager.log_message.emit("Entered vehicle. WASD to drive, Space to brake, F to exit.", "info")
 				return

@@ -54,10 +54,12 @@ material_override = SubResource("Mat_ground")
 shape = SubResource("BoxShape3D_ground")
 
 [node name="Player" type="CharacterBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 6)
 script = ExtResource("2_player")
 collision_layer = 2
 collision_mask = 1
+motion_mode = 0
+floor_snap_length = 0.3
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
 shape = SubResource("CapsuleShape3D_player")

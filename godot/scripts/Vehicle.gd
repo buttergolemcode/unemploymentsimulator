@@ -16,6 +16,9 @@ var is_driven: bool = false
 
 func _ready():
 	add_to_group("vehicle")
+	# Floor detection for gravity
+	motion_mode = CharacterBody3D.MOTION_MODE_GROUNDED
+	floor_snap_length = 0.3
 	_build_mesh()
 	rotation.y = yaw + PI
 
@@ -139,8 +142,13 @@ func _physics_process(delta):
 	
 	rotation.y = yaw + PI
 	
-	# NOTE: do NOT multiply by delta — move_and_slide() does that internally in Godot 4
-	velocity = Vector3(-sin(yaw) * speed, 0, -cos(yaw) * speed)
+	velocity.x = -sin(yaw) * speed
+	velocity.z = -cos(yaw) * speed
+	# Apply gravity so the car stays on the ground
+	if not is_on_floor():
+		velocity.y -= 14.0 * delta  # heavier gravity for cars
+	else:
+		velocity.y = 0
 	
 	move_and_slide()
 	
