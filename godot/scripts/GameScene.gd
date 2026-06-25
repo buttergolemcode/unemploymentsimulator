@@ -60,7 +60,7 @@ func _spawn_vehicles():
 		vehicle.script = preload("res://scripts/Vehicle.gd")
 		vehicle.car_color = vdata.color
 		vehicle.yaw = vdata.yaw
-		vehicle.global_position = Vector3(vdata.x, 0, vdata.z)
+		vehicle.position = Vector3(vdata.x, 0, vdata.z)
 		
 		# Collision
 		var col = CollisionShape3D.new()
@@ -112,7 +112,7 @@ func _spawn_npc(x: float, z: float, color: String, district: String, is_merchant
 	npc.npc_color = color
 	npc.district = district
 	npc.is_merchant = is_merchant
-	npc.global_position = Vector3(x, 0, z)
+	npc.position = Vector3(x, 0, z)
 	
 	var col = CollisionShape3D.new()
 	var shape = CapsuleShape3D.new()

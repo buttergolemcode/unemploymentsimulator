@@ -14,6 +14,7 @@ var in_vehicle: Node = null
 @onready var camera: Camera3D = $Camera3D
 
 func _ready():
+	add_to_group("player")
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _unhandled_input(event):
