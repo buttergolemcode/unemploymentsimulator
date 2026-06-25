@@ -122,30 +122,154 @@ This document captures the agreed-upon vision and the sprint roadmap. Update it 
 ### Sprint D — Assets & Map Polish (NEW — moved up) ⬅️ CURRENT NEXT
 Replace all placeholder boxes with real CC0 assets and design a proper city map.
 
-**Asset Integration:**
-- **Quaternius Cars Pack** (CC0) → replace box-mesh vehicles with real low-poly car models
-- **Quaternius Ultimate Animated Characters** (CC0) → replace capsule NPCs with 50+ animated characters (idle, walk, run, talk)
-- **Kenney City Kit** (CC0) → modular commercial/suburban/industrial/roads buildings
-- **Quaternius Downtown City MegaKit** (CC0) → 300+ modular city pieces (props, signs, trash, etc.)
-- **KayKit City Builder Bits** (CC0) → street props (lamps, benches, hydrants, plants)
+> **Physics engine decision (locked):** Stay with custom CharacterBody3D.
+> Researched VehicleBody3D + VehicleWheel3D and Jolt physics plugin — both are
+> overkill for arcade-style driving and don't help the NPC run-over mechanic.
+> VehicleBody3D is raycast-wheels sim-style (harder to tune, not better feel).
+> Jolt ships in Godot 4.4+ as optional backend but only helps RigidBody stacking
+> (we have ~0 RigidBodies). Custom approach stays.
 
-**Map Design:**
-- Logical city layout (not random grid):
-  - Harbor at waterfront (south edge) with docks, cranes, warehouses
-  - Industrial ring around downtown (factories, refineries)
-  - Downtown core with skyscrapers and main streets
-  - Slums on one side (denser, darker, more alleys)
-  - Suburbs on outskirts (single-family houses, gardens)
-  - Rural/greenbelt at map edge (forests, hills, highways out)
-- Real road network with intersections, traffic lights, signage
-- Parks, plazas, parking lots (not just buildings)
-- Distinguishable district "feel" (Harbor fog, Downtown neon, Slums grit)
+#### D.0 — Asset download (user task, manual) ⬠ BLOCKING
+Container has no internet — user must download and drop into `godot/assets/`:
+- `quaternius_cars/` — from https://quaternius.com/packs/cars.html (FBX + Blend)
+- `quaternius_characters/` — from https://quaternius.com/packs/ultimatedanimatedcharacter.html (FBX)
+- `kenney_city_commercial/` — https://kenney.nl/assets/city-kit-commercial (glTF)
+- `kenney_city_suburban/` — https://kenney.nl/assets/city-kit-suburban (glTF)
+- `kenney_city_industrial/` — https://kenney.nl/assets/city-kit-industrial (glTF)
+- `kenney_city_roads/` — https://kenney.nl/assets/city-kit-roads (glTF)
+- `quaternius_downtown_megakit/` — https://quaternius.com/packs/downtowncitymegakit.html (FBX)
+- `kaykit_city_bits/` — https://kaylousberg.itch.io/city-builder-bits (glTF)
+- `quaternius_streets/` — https://quaternius.com/packs/modularstreets.html (FBX)
 
-**Polish:**
-- Better lighting per district (warm downtown, cold harbor, dim slums)
-- Decals and props (graffiti, trash piles, parked cars, street vendors)
-- Water shader for harbor (waves, reflection)
-- Skybox / sky gradient based on time of day
+**Handoff protocol**: User confirms each pack dropped into `godot/assets/<pack_name>/`. AI then verifies file listing and proceeds with that pack's integration. Packs can be done incrementally — not all needed at once.
+
+#### D.1 — Godot project structure + import config
+- Create `godot/assets/` directory structure (above)
+- Set up `.import` defaults for FBX/GLB: mesh compression, texture compression (VRAM), animation import
+- Configure Godot's MeshLibrary for Kenney modular buildings (so we can grid-snap in editor)
+- Define naming convention: `assets/<pack>/<mesh>.glb` → scene + mesh resource path
+- Add asset credits to a credits screen (CC0 doesn't require, but nice to have)
+
+#### D.2 — Vehicle model integration (Quaternius Cars)
+- Import Quaternius Cars Pack FBX → 8 individual `.glb` scenes (sedan, sports, van, etc.)
+- Update `VehicleData.gd` to reference car model files instead of color hex strings
+- Update `Vehicle.gd _build_mesh()` to instantiate the chosen car model via `load("res://assets/quaternius_cars/sedan.glb").instantiate()`
+- Remove the old box-mesh build code (keep as fallback if asset missing)
+- Add wheel-spin animation (rotate wheels based on speed)
+- Add subtle body roll on hard turns (visual flair)
+
+#### D.3 — NPC model integration (Quaternius Animated Characters)
+- Import character pack FBX → multiple `.glb` scenes with AnimationPlayer (idle, walk, run)
+- Set up AnimationLibrary with shared animations across characters
+- Update `NPC.gd _build_mesh()` to randomly pick a character + walk animation
+- Replace `mesh.position.y = abs(sin(walk_phase)) * 0.06` hack with real walk animation
+- Add idle animation when NPC reaches target (instead of stopping dead)
+- Add 'scream' animation trigger on vehicle knockdown
+- Update player `_build_mesh()` to use a proper character model too (third-person view)
+
+#### D.4 — Building system overhaul (Kenney City Kit)
+- Build a **MeshLibrary** in Godot editor from Kenney modular building parts
+- Create a `BuildingGenerator.gd` that assembles buildings from modular parts:
+  - Pick base tile (1×1, 2×2, 4×4 footprint)
+  - Stack N floors (per district height range)
+  - Add roof variation (flat, pitched, with AC units)
+- Replace `_build_scheme_buildings()` to use real buildings per scheme type:
+  - Trading Floor → tall commercial tower
+  - Trap House → small suburban house
+  - Casino → ornate downtown building
+  - etc.
+- Replace `_build_filler_buildings()` to use modular commercial/suburban/industrial parts
+- Districts now have **distinct visual identity**:
+  - Downtown: tall commercial towers, glass facades
+  - Harbor: low industrial warehouses + cranes
+  - Slums: rundown suburban houses, boarded windows
+  - Industrial: factories, silos, pipes
+  - Suburbs: clean single-family homes, gardens
+  - Rural: farmhouses, barns, fields
+
+#### D.5 — Road network redesign (Kenney Roads + Quaternius Streets)
+- Replace current grid-with-asphalt-planes with **modular road tiles**:
+  - Straight, curve, T-junction, 4-way intersection
+  - With/without sidewalk, with/without crosswalk
+- Build a real **road graph** (not just grid):
+  - Main avenues (4-lane, with center divider)
+  - Side streets (2-lane, residential)
+  - Alleyways (1-lane, slums)
+  - Highway loops around city
+- Add **traffic lights** at major intersections (visual only for now)
+- Add **road markings**: lane lines, crosswalks, stop lines
+- Snap road tiles to 10m grid for clean layout
+
+#### D.6 — Map layout redesign (logical city)
+Replace the current radial grid with a designed city plan:
+```
+                NORTH (forests, hills)
+                        |
+    SUBURBS    |    SUBURBS
+       \       |       /
+        \      |      /
+   INDUSTRIAL --+-- HARBOR (waterfront, east)
+        /      |      \
+       /       |       \
+    SLUMS  -- DOWNTOWN -- (highway exit east)
+                        |
+                  SOUTH (highway, rural)
+```
+- Water on east edge (harbor district with docks)
+- Highway rings the city (with exits to downtown)
+- Each district has clear borders (river, highway, or greenbelt)
+- Districts sized to actual gameplay needs (downtown large for trading, slums small for drug deals, etc.)
+- 8 scheme buildings placed at thematic spots:
+  - Trading Floor → downtown financial district
+  - Corporate Tower (wirefraud) → downtown
+  - Accountant Office (taxfraud) → downtown side street
+  - Trap House (drugs) → slums
+  - Internet Cafe (scam) → slums/industrial border
+  - Corner Store (robbery) → slums
+  - E-Com Warehouse (ecom) → industrial
+  - Casino (gambling) → downtown entertainment strip
+
+#### D.7 — Street props & polish (KayKit + Downtown MegaKit)
+- Distribute street props: lamps, benches, hydrants, trash cans, planters
+- Add storefront props (Quaternius Downtown MegaKit): awnings, signs, neon
+- Add parked cars along streets (using Quaternius Cars, non-drivable instances)
+- Add district-specific props:
+  - Harbor: cargo containers, cranes, pallets
+  - Industrial: pipes, barrels, machinery
+  - Slums: graffiti decals, trash piles, broken cars
+  - Downtown: planters, art installations, fancy lamps
+- Add **decals** for road damage, graffiti, oil stains
+
+#### D.8 — Lighting & atmosphere polish
+- Per-district lighting setup:
+  - Downtown: warm white street lamps, neon accent
+  - Harbor: cold blue, foggy
+  - Slums: dim yellow, flickering
+  - Industrial: harsh sodium vapor
+  - Suburbs: warm residential porch lights
+  - Rural: moonlight only
+- Skybox: gradient sky with sun position synced to day/night cycle
+- Better fog: distance + height fog for depth
+- Reflection probes at key intersections (for wet-street look)
+- Particle effects: dust in industrial, leaves in suburbs, mist in harbor
+
+#### D.9 — Water shader (harbor)
+- Animated water plane with vertex displacement (waves)
+- Reflection of sky + nearby buildings
+- Foam at shoreline
+- Distant fog over water for horizon blend
+
+#### D.10 — Sprint D acceptance test
+- [ ] All 8 scheme buildings use real CC0 models
+- [ ] All vehicles use Quaternius car models (not boxes)
+- [ ] All NPCs use animated character models (not capsules)
+- [ ] Player has a real character model in third-person view
+- [ ] City has 6 visually distinct districts
+- [ ] Road network is logically laid out (not random grid)
+- [ ] Street props distributed naturally
+- [ ] Per-district lighting makes each area feel different
+- [ ] No placeholder boxes visible anywhere in the world
+- [ ] FPS stays above 60 on target hardware
 
 ### Sprint E — Sound & Atmosphere ⬅️ NEXT AFTER D
 Build the audio layer that turns the visual world into a "living" world.
