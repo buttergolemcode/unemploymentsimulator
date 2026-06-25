@@ -30,7 +30,7 @@ func _create_rain():
 	mm.mesh = _make_rain_drop_mesh()
 	mm.instance_count = rain_count
 	rain_mesh.multimesh = mm
-	rain_mesh.cast_shadow = false
+	rain_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(rain_mesh)
 	
 	drops.clear()
