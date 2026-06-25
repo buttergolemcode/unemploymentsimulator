@@ -129,19 +129,29 @@ Replace all placeholder boxes with real CC0 assets and design a proper city map.
 > Jolt ships in Godot 4.4+ as optional backend but only helps RigidBody stacking
 > (we have ~0 RigidBodies). Custom approach stays.
 
-#### D.0 — Asset download (user task, manual) ⬠ BLOCKING
-Container has no internet — user must download and drop into `godot/assets/`:
-- `quaternius_cars/` — from https://quaternius.com/packs/cars.html (FBX + Blend)
-- `quaternius_characters/` — from https://quaternius.com/packs/ultimatedanimatedcharacter.html (FBX)
-- `kenney_city_commercial/` — https://kenney.nl/assets/city-kit-commercial (glTF)
-- `kenney_city_suburban/` — https://kenney.nl/assets/city-kit-suburban (glTF)
-- `kenney_city_industrial/` — https://kenney.nl/assets/city-kit-industrial (glTF)
-- `kenney_city_roads/` — https://kenney.nl/assets/city-kit-roads (glTF)
-- `quaternius_downtown_megakit/` — https://quaternius.com/packs/downtowncitymegakit.html (FBX)
-- `kaykit_city_bits/` — https://kaylousberg.itch.io/city-builder-bits (glTF)
-- `quaternius_streets/` — https://quaternius.com/packs/modularstreets.html (FBX)
+#### D.0 — Asset download ✅ DONE
+All 8 CC0 asset packs downloaded directly into `godot/assets/` via curl + gdown:
 
-**Handoff protocol**: User confirms each pack dropped into `godot/assets/<pack_name>/`. AI then verifies file listing and proceeds with that pack's integration. Packs can be done incrementally — not all needed at once.
+| Pack | Source | Format | Status |
+|------|--------|--------|--------|
+| Kenney City Kit Commercial | kenney.nl | GLB/FBX/OBJ | ✅ 42 buildings |
+| Kenney City Kit Suburban | kenney.nl | GLB/FBX/OBJ | ✅ 35+ houses |
+| Kenney City Kit Industrial | kenney.nl | GLB/FBX/OBJ | ✅ Warehouses/factories |
+| Kenney City Kit Roads | kenney.nl | GLB/FBX/OBJ | ✅ 65+ road tiles |
+| Quaternius Cars | quaternius.com (Drive) | FBX/OBJ | ✅ 7 car models |
+| Quaternius Animated Characters | quaternius.com (Drive) | .blend only | ⚠️ Needs Blender |
+| Quaternius Modular Streets | quaternius.com (Drive) | .blend only | ⚠️ Needs Blender |
+| KayKit City Builder Bits | kaylousberg.itch.io | GLTF/FBX/OBJ | ✅ Street props |
+
+**Open issue**: Quaternius Characters & Streets only available as .blend files.
+Godot 4 can import .blend directly IF Blender is installed on the system.
+Options:
+1. User installs Blender → Godot auto-imports .blend files
+2. AI fetches per-character GLB versions from poly.pizza (poly.pizza currently blocks our requests — 403)
+3. User manually downloads GLB versions from poly.pizza browser
+
+For now: D.2 (vehicles) and D.4/D.5/D.7 (buildings/roads/props) can proceed
+using the GLB/FBX assets. D.3 (NPCs) blocked until Blender or alternative source.
 
 #### D.1 — Godot project structure + import config
 - Create `godot/assets/` directory structure (above)
