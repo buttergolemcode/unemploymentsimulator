@@ -153,7 +153,12 @@ func _physics_process(delta):
 		# Speed-dependent steering:
 		# - At low speed (just above min): full turn_rate (tight maneuvering)
 		# - At high speed: reduced turn (prevent unrealistic tank-like spinning)
-		var speed_factor = clamp(3.0 / (abs_speed + 1.0), 0.5, 1.2)
+		# Tighter at all speeds, but decays faster at high speed
+		# At 1 m/s: factor=2.0 -> 1.5, turn=4.5 rad/s (very tight)
+		# At 5 m/s: factor=0.5, turn=1.5 rad/s (still tight)
+		# At 10 m/s: factor=0.27 -> 0.4, turn=1.2 rad/s (gentle highway)
+		# At 22 m/s (max): factor=0.13 -> 0.4, turn=1.2 rad/s (stable)
+		var speed_factor = clamp(2.0 / (abs_speed + 0.5), 0.4, 1.5)
 		var turn = steer * turn_rate * speed_factor * delta
 		# Steering direction: D=right should turn car right.
 		# Forward: yaw-- turns front toward +X (right). Reverse: inverted.
