@@ -15,6 +15,7 @@ var in_vehicle: Node = null
 
 func _ready():
 	add_to_group("player")
+	camera.set_top_level(true)  # detach camera from player transform
 	_build_mesh()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -61,7 +62,7 @@ func _physics_process(delta):
 	
 	visible = camera_mode == "third"
 	rotation.y = yaw
-	camera.rotation.x = pitch
+	# Camera is top_level so set full rotation explicitly
 	
 	var input_forward = 0.0
 	var input_right = 0.0
@@ -90,13 +91,14 @@ func _physics_process(delta):
 	move_and_slide()
 	
 	if camera_mode == "first":
-		camera.position = Vector3(0, 1.6, 0)
+		camera.global_position = global_position + Vector3(0, 1.6, 0)
+		camera.rotation = Vector3(pitch, yaw, 0)
 		camera.fov = 70
 	else:
-		var dist = 5.0
-		var h = 2.5
+		var dist = 4.5
+		var h = 1.6
 		camera.global_position = global_position + Vector3(sin(yaw) * dist, h, cos(yaw) * dist)
-		camera.look_at(global_position + Vector3(0, 1.4, 0))
+		camera.look_at(global_position + Vector3(0, 1.0, 0))
 		camera.fov = 60
 	
 	_check_nearby()
@@ -105,8 +107,8 @@ func _update_vehicle_camera():
 	var v = in_vehicle
 	if not v:
 		return
-	var dist = 8.0
-	var h = 3.8
+	var dist = 7.0
+	var h = 2.5
 	camera.global_position = v.global_position + Vector3(sin(yaw) * dist, h, cos(yaw) * dist)
 	camera.look_at(v.global_position + Vector3(0, 1.2, 0))
 	camera.fov = 65
@@ -151,8 +153,9 @@ func _try_vehicle_enter_exit():
 		var v = in_vehicle
 		v.exit()
 		in_vehicle = null
-		# Place player beside vehicle
-		var exit_offset = Vector3(cos(v.yaw) * -1.8, 0, -sin(v.yaw) * -1.8)
+		# Place player BEHIND the vehicle (opposite of movement direction)
+		# Movement direction is (-sin(yaw), 0, -cos(yaw)), so behind is +(sin(yaw), cos(yaw))
+		var exit_offset = Vector3(sin(v.yaw) * 2.5, 0, cos(v.yaw) * 2.5)
 		global_position = v.global_position + exit_offset
 		visible = camera_mode == "third"
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

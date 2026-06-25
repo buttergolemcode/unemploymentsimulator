@@ -150,7 +150,10 @@ func _process(delta):
 	
 	# Day/night cycle
 	var t = fmod(elapsed_time / CYCLE_SECONDS, 1.0)
-	var sun_angle = (t - 0.25) * TAU
+	# Godot 4: rotation.x=0 is noon (light pointing down),
+	# rotation.x=PI is midnight (light pointing up).
+	# t=0 -> midnight, t=0.5 -> noon
+	var sun_angle = PI - t * TAU
 	directional_light.rotation.x = sun_angle
 	
 	var phase = _get_day_phase(t)

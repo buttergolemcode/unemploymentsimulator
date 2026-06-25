@@ -151,7 +151,6 @@ static func _build_terrain(parent: Node3D) -> void:
         
         var mi = MeshInstance3D.new()
         mi.mesh = final_mesh
-        mi.rotation.x = -PI / 2  # PlaneMesh is XY, rotate to XZ
         mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
         
         # Material that uses vertex colors
