@@ -17,50 +17,60 @@ var is_driven: bool = false
 func _ready():
 	add_to_group("vehicle")
 	_build_mesh()
-	rotation.y = yaw
+	rotation.y = yaw + PI
 
 func _build_mesh():
-	# Body
-	var body = CSGBox3D.new()
-	body.size = Vector3(2, 0.7, 4.4)
-	body.position = Vector3(0, 0.6, 0)
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = Color.from_string(car_color, Color.GRAY)
 	mat.roughness = 0.4
 	mat.metalness = 0.5
-	body.material = mat
+	
+	# Body
+	var body = MeshInstance3D.new()
+	var body_m = BoxMesh.new()
+	body_m.size = Vector3(2, 0.7, 4.4)
+	body.mesh = body_m
+	body.position = Vector3(0, 0.6, 0)
+	body.material_override = mat
 	mesh.add_child(body)
 	
 	# Cabin
-	var cabin = CSGBox3D.new()
-	cabin.size = Vector3(1.7, 0.6, 2.0)
+	var cabin = MeshInstance3D.new()
+	var cabin_m = BoxMesh.new()
+	cabin_m.size = Vector3(1.7, 0.6, 2.0)
+	cabin.mesh = cabin_m
 	cabin.position = Vector3(0, 1.25, -0.2)
-	cabin.material = mat
+	cabin.material_override = mat
 	mesh.add_child(cabin)
 	
 	# Windshield
-	var wind = CSGBox3D.new()
-	wind.size = Vector3(1.6, 0.5, 0.1)
+	var wind = MeshInstance3D.new()
+	var wind_m = BoxMesh.new()
+	wind_m.size = Vector3(1.6, 0.5, 0.1)
+	wind.mesh = wind_m
 	wind.position = Vector3(0, 1.25, 0.85)
 	var glass_mat = StandardMaterial3D.new()
 	glass_mat.albedo_color = Color(0.06, 0.09, 0.16, 0.8)
 	glass_mat.roughness = 0.1
 	glass_mat.metalness = 0.9
 	glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	wind.material = glass_mat
+	wind.material_override = glass_mat
 	mesh.add_child(wind)
 	
 	# Wheels
 	for pos in [Vector3(-0.9, 0.35, 1.5), Vector3(0.9, 0.35, 1.5), Vector3(-0.9, 0.35, -1.5), Vector3(0.9, 0.35, -1.5)]:
-		var wheel = CSGCylinder3D.new()
-		wheel.radius = 0.35
-		wheel.height = 0.25
+		var wheel = MeshInstance3D.new()
+		var w_m = CylinderMesh.new()
+		w_m.top_radius = 0.35
+		w_m.bottom_radius = 0.35
+		w_m.height = 0.25
+		wheel.mesh = w_m
 		wheel.rotation.z = PI / 2
 		wheel.position = pos
 		var wmat = StandardMaterial3D.new()
 		wmat.albedo_color = Color(0.1, 0.1, 0.1)
 		wmat.roughness = 0.9
-		wheel.material = wmat
+		wheel.material_override = wmat
 		mesh.add_child(wheel)
 	
 	# Headlights
@@ -83,11 +93,9 @@ func _build_mesh():
 
 func _physics_process(delta):
 	if not is_driven:
-		# Apply friction when parked
 		speed = move_toward(speed, 0, friction * delta)
 		return
 	
-	# Input
 	var throttle = 0.0
 	var steer = 0.0
 	var brake_input = false
@@ -103,7 +111,6 @@ func _physics_process(delta):
 	if Input.is_key_pressed(KEY_SPACE):
 		brake_input = true
 	
-	# Apply throttle
 	if throttle > 0:
 		speed += accel * throttle * delta
 		speed = min(speed, max_speed)
@@ -116,7 +123,6 @@ func _physics_process(delta):
 		elif speed < 0:
 			speed = min(0, speed + friction * delta)
 	
-	# Brake
 	if brake_input:
 		var decel = brake_force * delta
 		if speed > 0:
@@ -124,7 +130,6 @@ func _physics_process(delta):
 		elif speed < 0:
 			speed = min(0, speed + decel)
 	
-	# Steering (scales with speed)
 	var speed_factor = min(1, abs(speed) / 5)
 	var turn = steer * turn_rate * speed_factor * delta
 	if speed < 0:
@@ -132,16 +137,14 @@ func _physics_process(delta):
 	else:
 		yaw -= turn
 	
-	rotation.y = yaw + PI  # +PI because car model faces +Z but movement uses -Z forward
+	rotation.y = yaw + PI
 	
-	# Movement: forward = (-sin(yaw), -cos(yaw)) matching player convention
 	var dx = -sin(yaw) * speed * delta
 	var dz = -cos(yaw) * speed * delta
 	
 	velocity = Vector3(dx, 0, dz)
 	move_and_slide()
 	
-	# Sync player position
 	var player = get_tree().get_first_node_in_group("player")
 	if player:
 		player.global_position = global_position

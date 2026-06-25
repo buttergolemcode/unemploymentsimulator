@@ -19,58 +19,73 @@ func _ready():
 		add_to_group("pedestrian")
 
 func _build_mesh():
-	# Body capsule
-	var body = CSGCylinder3D.new()
-	body.radius = 0.22
-	body.height = 1.0
-	body.position = Vector3(0, 0.95, 0)
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = Color.from_string(npc_color, Color.GRAY)
 	mat.roughness = 0.8
-	body.material = mat
+	
+	# Body (cylinder)
+	var body = MeshInstance3D.new()
+	var b_mesh = CylinderMesh.new()
+	b_mesh.top_radius = 0.22
+	b_mesh.bottom_radius = 0.22
+	b_mesh.height = 1.0
+	body.mesh = b_mesh
+	body.position = Vector3(0, 0.95, 0)
+	body.material_override = mat
 	mesh.add_child(body)
 	
-	# Head
-	var head = CSGSphere3D.new()
-	head.radius = 0.13
+	# Head (sphere)
+	var head = MeshInstance3D.new()
+	var h_mesh = SphereMesh.new()
+	h_mesh.radius = 0.13
+	h_mesh.height = 0.26
+	head.mesh = h_mesh
 	head.position = Vector3(0, 1.65, 0)
 	var hmat = StandardMaterial3D.new()
 	hmat.albedo_color = Color(0.99, 0.9, 0.55)
 	hmat.roughness = 0.6
-	head.material = hmat
+	head.material_override = hmat
 	mesh.add_child(head)
 	
-	# Hat/hair
-	var hat = CSGSphere3D.new()
-	hat.radius = 0.14
+	# Hat/hair (half sphere = scaled sphere)
+	var hat = MeshInstance3D.new()
+	var hat_mesh = SphereMesh.new()
+	hat_mesh.radius = 0.14
+	hat_mesh.height = 0.28
+	hat.mesh = hat_mesh
 	hat.position = Vector3(0, 1.71, 0)
-	hat.material = hmat
+	hat.scale = Vector3(1, 0.5, 1)  # flatten to half-sphere
+	var hatmat = StandardMaterial3D.new()
+	hatmat.albedo_color = Color(0.11, 0.1, 0.09)
+	hatmat.roughness = 0.9
+	hat.material_override = hatmat
 	mesh.add_child(hat)
 	
 	# Merchant badge
 	if is_merchant:
-		var badge = CSGSphere3D.new()
-		badge.radius = 0.1
+		var badge = MeshInstance3D.new()
+		var bg_mesh = SphereMesh.new()
+		bg_mesh.radius = 0.1
+		bg_mesh.height = 0.2
+		badge.mesh = bg_mesh
 		badge.position = Vector3(0, 2.0, 0)
 		var bmat = StandardMaterial3D.new()
 		bmat.albedo_color = Color.from_string(npc_color, Color.GREEN)
 		bmat.emission_enabled = true
 		bmat.emission = Color.from_string(npc_color, Color.GREEN)
 		bmat.emission_energy_multiplier = 1.2
-		badge.material = bmat
+		badge.material_override = bmat
 		mesh.add_child(badge)
 
 func _physics_process(delta):
 	if is_merchant:
 		return
 	
-	# Move toward target
 	var dx = target_pos.x - global_position.x
 	var dz = target_pos.z - global_position.z
 	var dist = sqrt(dx * dx + dz * dz)
 	
 	if dist < 0.5:
-		# Pick new target
 		_pick_new_target()
 	else:
 		velocity = Vector3(dx / dist * speed, 0, dz / dist * speed)
@@ -81,7 +96,6 @@ func _physics_process(delta):
 		move_and_slide()
 
 func _pick_new_target():
-	# Pick a random point within 30m
 	var angle = randf() * TAU
 	var dist = 15 + randf() * 25
 	target_pos = global_position + Vector3(cos(angle) * dist, 0, sin(angle) * dist)
