@@ -15,7 +15,7 @@ var in_vehicle: Node = null
 
 func _ready():
 	add_to_group("player")
-	camera.set_top_level(true)  # detach camera from player transform
+	camera.top_level = true  # detach camera from player transform (Godot 4.7 API)
 	_build_mesh()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 

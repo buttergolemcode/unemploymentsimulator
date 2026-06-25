@@ -115,7 +115,6 @@ static func _build_terrain(parent: Node3D) -> void:
         mesh.subdivide_width = segs
         mesh.subdivide_depth = segs
         
-        var _arr_mesh = ArrayMesh.new()
         var surf = SurfaceTool.new()
         surf.create_from(mesh, 0)
         
