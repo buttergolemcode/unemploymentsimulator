@@ -15,6 +15,7 @@ var in_vehicle: Node = null
 
 func _ready():
 	add_to_group("player")
+	_build_mesh()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _unhandled_input(event):
@@ -92,10 +93,10 @@ func _physics_process(delta):
 		camera.position = Vector3(0, 1.6, 0)
 		camera.fov = 70
 	else:
-		var dist = 6.0
-		var h = 4.0
+		var dist = 5.0
+		var h = 2.5
 		camera.global_position = global_position + Vector3(sin(yaw) * dist, h, cos(yaw) * dist)
-		camera.look_at(global_position + Vector3(0, 1.2, 0))
+		camera.look_at(global_position + Vector3(0, 1.4, 0))
 		camera.fov = 60
 	
 	_check_nearby()
@@ -168,3 +169,51 @@ func _try_vehicle_enter_exit():
 				visible = false
 				GameManager.log_message.emit("Entered vehicle. WASD to drive, Space to brake, F to exit.", "info")
 				return
+
+# ============================================================
+# Player visual model (visible only in third-person mode)
+# ============================================================
+func _build_mesh():
+	var mesh_node = Node3D.new()
+	mesh_node.name = "PlayerMesh"
+	add_child(mesh_node)
+	
+	# Body (capsule)
+	var body = MeshInstance3D.new()
+	var body_m = CapsuleMesh.new()
+	body_m.radius = 0.35
+	body_m.height = 1.4
+	body.mesh = body_m
+	body.position = Vector3(0, 0.7, 0)
+	var body_mat = StandardMaterial3D.new()
+	body_mat.albedo_color = Color(0.12, 0.23, 0.54)  # dark blue
+	body_mat.roughness = 0.7
+	body.material_override = body_mat
+	mesh_node.add_child(body)
+	
+	# Head (sphere)
+	var head = MeshInstance3D.new()
+	var head_m = SphereMesh.new()
+	head_m.radius = 0.18
+	head_m.height = 0.36
+	head.mesh = head_m
+	head.position = Vector3(0, 1.6, 0)
+	var head_mat = StandardMaterial3D.new()
+	head_mat.albedo_color = Color(0.96, 0.85, 0.7)  # warm skin tone
+	head_mat.roughness = 0.6
+	head.material_override = head_mat
+	mesh_node.add_child(head)
+	
+	# Simple hat (cylinder) for visibility from behind
+	var hat = MeshInstance3D.new()
+	var hat_m = CylinderMesh.new()
+	hat_m.top_radius = 0.2
+	hat_m.bottom_radius = 0.2
+	hat_m.height = 0.12
+	hat.mesh = hat_m
+	hat.position = Vector3(0, 1.78, 0)
+	var hat_mat = StandardMaterial3D.new()
+	hat_mat.albedo_color = Color(0.08, 0.08, 0.1)  # black beanie
+	hat_mat.roughness = 0.85
+	hat.material_override = hat_mat
+	mesh_node.add_child(hat)

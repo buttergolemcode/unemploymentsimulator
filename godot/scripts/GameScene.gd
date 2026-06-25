@@ -4,7 +4,7 @@ extends Node3D
 @onready var directional_light: DirectionalLight3D = $DirectionalLight3D
 @onready var world_env: WorldEnvironment = $WorldEnvironment
 
-var elapsed_time: float = 0.0
+var elapsed_time: float = 360.0  # Start at noon (t=0.5)
 const CYCLE_SECONDS: float = 720.0  # 12 min = 24h
 
 var building_panel: Control

@@ -139,10 +139,9 @@ func _physics_process(delta):
 	
 	rotation.y = yaw + PI
 	
-	var dx = -sin(yaw) * speed * delta
-	var dz = -cos(yaw) * speed * delta
+	# NOTE: do NOT multiply by delta — move_and_slide() does that internally in Godot 4
+	velocity = Vector3(-sin(yaw) * speed, 0, -cos(yaw) * speed)
 	
-	velocity = Vector3(dx, 0, dz)
 	move_and_slide()
 	
 	var player = get_tree().get_first_node_in_group("player")
