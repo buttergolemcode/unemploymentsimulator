@@ -33,7 +33,7 @@ func _build_mesh():
 	var body_m = BoxMesh.new()
 	body_m.size = Vector3(2, 0.7, 4.4)
 	body.mesh = body_m
-	body.position = Vector3(0, 0.6, 0)
+	body.position = Vector3(0, 0.35, 0)
 	body.material_override = mat
 	mesh.add_child(body)
 	
@@ -42,7 +42,7 @@ func _build_mesh():
 	var cabin_m = BoxMesh.new()
 	cabin_m.size = Vector3(1.7, 0.6, 2.0)
 	cabin.mesh = cabin_m
-	cabin.position = Vector3(0, 1.25, -0.2)
+	cabin.position = Vector3(0, 1.0, -0.2)
 	cabin.material_override = mat
 	mesh.add_child(cabin)
 	
@@ -51,7 +51,7 @@ func _build_mesh():
 	var wind_m = BoxMesh.new()
 	wind_m.size = Vector3(1.6, 0.5, 0.1)
 	wind.mesh = wind_m
-	wind.position = Vector3(0, 1.25, 0.85)
+	wind.position = Vector3(0, 1.0, 0.85)
 	var glass_mat = StandardMaterial3D.new()
 	glass_mat.albedo_color = Color(0.06, 0.09, 0.16, 0.8)
 	glass_mat.roughness = 0.1
@@ -79,7 +79,7 @@ func _build_mesh():
 	# Headlights
 	for x in [-0.6, 0.6]:
 		var hl = OmniLight3D.new()
-		hl.position = Vector3(x, 0.6, 2.2)
+		hl.position = Vector3(x, 0.5, 2.2)
 		hl.light_color = Color(1, 0.95, 0.8)
 		hl.light_energy = 1.5
 		hl.omni_range = 8.0
@@ -88,7 +88,7 @@ func _build_mesh():
 	# Taillights
 	for x in [-0.6, 0.6]:
 		var tl = OmniLight3D.new()
-		tl.position = Vector3(x, 0.6, -2.2)
+		tl.position = Vector3(x, 0.5, -2.2)
 		tl.light_color = Color(1, 0.2, 0.1)
 		tl.light_energy = 0.8
 		tl.omni_range = 4.0
