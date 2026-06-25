@@ -112,6 +112,10 @@ func _spawn_npc(x: float, z: float, color: String, district: String, is_merchant
 	npc.npc_color = color
 	npc.district = district
 	npc.is_merchant = is_merchant
+	# NPCs on collision layer 3, mask only layer 1 (ground/walls) - NOT layer 2 (player/vehicle)
+	# This lets vehicles drive through NPCs (handled in NPC.gd via distance check)
+	npc.collision_layer = 4  # layer 3
+	npc.collision_mask = 1  # only collide with ground layer
 	npc.position = Vector3(x, 0, z)
 	
 	var col = CollisionShape3D.new()

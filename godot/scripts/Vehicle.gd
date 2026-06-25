@@ -1,15 +1,16 @@
-# Vehicle.gd — A drivable car
+# Vehicle.gd — A drivable car with semi-realistic physics
 extends CharacterBody3D
 
 var car_color: String = "#dc2626"
 var yaw: float = 0.0
-var speed: float = 0.0
+var speed: float = 0.0  # forward speed (signed: +forward / -reverse)
 var max_speed: float = 22.0
 var max_reverse: float = 8.0
-var accel: float = 8.0
-var brake_force: float = 14.0
-var friction: float = 3.0
-var turn_rate: float = 1.8
+var accel: float = 10.0       # engine force when accelerating
+var brake_force: float = 18.0  # deceleration when braking
+var engine_brake: float = 4.0  # natural deceleration when no throttle
+var turn_rate: float = 1.4     # max yaw rate at full steering
+var min_turn_speed: float = 1.0  # below this speed, no turning (no tank spins)
 var is_driven: bool = false
 
 @onready var mesh: Node3D = $CarMesh
@@ -96,7 +97,9 @@ func _build_mesh():
 
 func _physics_process(delta):
 	if not is_driven:
-		speed = move_toward(speed, 0, friction * delta)
+		# Apply engine brake when nobody is driving
+		speed = move_toward(speed, 0, engine_brake * delta)
+		_apply_gravity_and_move(delta)
 		return
 	
 	var throttle = 0.0
@@ -114,18 +117,27 @@ func _physics_process(delta):
 	if Input.is_key_pressed(KEY_SPACE):
 		brake_input = true
 	
+	# === Engine model ===
+	# Forward acceleration
 	if throttle > 0:
 		speed += accel * throttle * delta
 		speed = min(speed, max_speed)
+	# Reverse (slower accel)
 	elif throttle < 0:
-		speed += -accel * abs(throttle) * delta * 0.6
-		speed = max(speed, -max_reverse)
+		# If moving forward, throttle<0 acts as brake first
+		if speed > 0.5:
+			speed = max(0, speed - brake_force * delta)
+		else:
+			speed += -accel * 0.6 * delta
+			speed = max(speed, -max_reverse)
+	# Engine braking when no throttle
 	else:
 		if speed > 0:
-			speed = max(0, speed - friction * delta)
+			speed = max(0, speed - engine_brake * delta)
 		elif speed < 0:
-			speed = min(0, speed + friction * delta)
+			speed = min(0, speed + engine_brake * delta)
 	
+	# Explicit brake
 	if brake_input:
 		var decel = brake_force * delta
 		if speed > 0:
@@ -133,29 +145,64 @@ func _physics_process(delta):
 		elif speed < 0:
 			speed = min(0, speed + decel)
 	
-	var speed_factor = min(1, abs(speed) / 5)
-	var turn = steer * turn_rate * speed_factor * delta
-	if speed < 0:
-		yaw += turn
-	else:
-		yaw -= turn
+	# === Steering model ===
+	# Cars cannot turn in place — require minimum forward motion.
+	# Steering authority scales with speed (more speed = less turn to avoid spin).
+	var abs_speed = abs(speed)
+	if abs_speed > min_turn_speed:
+		# Speed-dependent steering:
+		# - At low speed (just above min): full turn_rate (tight maneuvering)
+		# - At high speed: reduced turn (prevent unrealistic tank-like spinning)
+		var speed_factor = clamp(2.0 / (abs_speed + 2.0), 0.3, 1.0)
+		var turn = steer * turn_rate * speed_factor * delta
+		# Reverse steering when going backwards (like a real car)
+		if speed < 0:
+			yaw -= turn
+		else:
+			yaw += turn
 	
 	rotation.y = yaw + PI
 	
+	# === Velocity from yaw + speed ===
 	velocity.x = -sin(yaw) * speed
 	velocity.z = -cos(yaw) * speed
+	
+	_apply_gravity_and_move(delta)
+	
+	# === Collision response: lose speed on impact ===
+	# After move_and_slide(), check if we hit something and bleed off speed.
+	# This prevents the "spin in place against wall with full speed" bug.
+	if get_slide_collision_count() > 0:
+		# Determine collision component along velocity direction
+		var hit_normal = Vector3.ZERO
+		for i in get_slide_collision_count():
+			var c = get_slide_collision(i)
+			hit_normal += c.get_normal()
+		if hit_normal.length() > 0:
+			hit_normal = hit_normal.normalized()
+			# Project velocity onto hit normal (how much we hit into the wall)
+			var v_along_normal = velocity.dot(-hit_normal)
+			if v_along_normal > 0.5:
+				# Collision cost: lose most of the speed into the wall
+				# Plus a hard impact reduces overall speed
+				var impact_strength = clamp(v_along_normal / 8.0, 0.3, 0.95)
+				speed *= (1.0 - impact_strength)
+				# Apply some physical pushback (small bounce away from wall)
+				velocity += hit_normal * 1.5
+	
+	# Sync player to vehicle position
+	var player = get_tree().get_first_node_in_group("player")
+	if player:
+		player.global_position = global_position
+		player.yaw = yaw
+
+func _apply_gravity_and_move(delta):
 	# Apply gravity so the car stays on the ground
 	if not is_on_floor():
 		velocity.y -= 14.0 * delta  # heavier gravity for cars
 	else:
 		velocity.y = 0
-	
 	move_and_slide()
-	
-	var player = get_tree().get_first_node_in_group("player")
-	if player:
-		player.global_position = global_position
-		player.yaw = yaw
 
 func enter():
 	is_driven = true

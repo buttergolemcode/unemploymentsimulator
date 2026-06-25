@@ -8,6 +8,8 @@ var district: String = "downtown"
 var facing: float = 0.0
 var is_merchant: bool = false
 var walk_phase: float = 0.0
+var is_down: bool = false  # knocked down by vehicle
+var down_timer: float = 0.0  # seconds remaining down
 
 @onready var mesh: Node3D = $NPCMesh
 
@@ -80,6 +82,32 @@ func _build_mesh():
 func _physics_process(delta):
 	if is_merchant:
 		return
+	
+	# Handle knockdown state
+	if is_down:
+		down_timer -= delta
+		# Stay down, slowly recover
+		mesh.rotation.x = lerp(mesh.rotation.x, -PI / 2, delta * 5)
+		velocity = Vector3.ZERO
+		move_and_slide()
+		if down_timer <= 0:
+			is_down = false
+			mesh.rotation.x = 0
+			_pick_new_target()
+		return
+	
+	# Check for nearby vehicles (get run over)
+	for vehicle in get_tree().get_nodes_in_group("vehicle"):
+		var vd = global_position.distance_to(vehicle.global_position)
+		if vd < 2.5 and abs(vehicle.speed) > 3.0:
+			# Knocked down by vehicle
+			is_down = true
+			down_timer = 4.0  # down for 4 seconds
+			# Knockback in vehicle's movement direction
+			var kb_dir = (global_position - vehicle.global_position).normalized()
+			velocity = kb_dir * 5.0
+			move_and_slide()
+			return
 	
 	var dx = target_pos.x - global_position.x
 	var dz = target_pos.z - global_position.z
