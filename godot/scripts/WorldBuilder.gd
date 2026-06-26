@@ -255,6 +255,8 @@ static func _build_terrain(parent: Node3D) -> void:
 					col = Color(0.20, 0.30, 0.18)
 				"rural":
 					col = Color(0.25, 0.35, 0.18)  # green grass
+				"canyon":
+					col = Color(0.35, 0.30, 0.25)  # mountain rock
 				_:
 					col = Color(0.08, 0.18, 0.32)  # water
 		mdt.set_vertex_color(i, col)
@@ -631,7 +633,7 @@ static func _build_filler_buildings(parent: Node3D) -> void:
 static func _build_block(parent: Node3D, bx: float, bz: float) -> void:
 	# District at block center
 	var dist_id = get_district_at(bx, bz)
-	if dist_id == "water" or dist_id == "rural":
+	if dist_id == "water" or dist_id == "rural" or dist_id == "canyon":
 		return  # no buildings in water/rural
 	
 	# Block bounds (BLOCK_SIZE wide, with sidewalk + margin subtracted)
