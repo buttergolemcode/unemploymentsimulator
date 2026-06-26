@@ -3,49 +3,144 @@
 class_name WorldBuilder
 extends RefCounted
 
-# District definitions
+# ============================================================
+# DISTRICT LAYOUT (D.4 — Map Layout Redesign)
+# ============================================================
+# The city is divided into 6 districts with defined polygon boundaries.
+# Layout (top-down view, +X = East, +Z = South):
+#
+#                     NORTH (rural, forests)
+#                  -180 < z < -120
+#
+#   WEST suburban     |    EAST suburban
+#   -180<x<-80        |    80<x<180
+#   -120<z<40         |    -120<z<40
+#                   --+--  DOWNTOWN (center)
+#                        -80<x<80, -80<z<80
+#
+#   INDUSTRIAL (NW)   |    HARBOR (East, waterfront)
+#   -180<x<-80        |    120<x<260
+#   -120<z<80         |    -100<z<180
+#                        (water starts at x=180)
+#
+#   SLUMS (SW)        |    SOUTH (rural, highway)
+#   -180<x<-80        |    z > 120
+#   40<z<180          |
+#
+# Each district polygon defines its boundary as Vector2 points (x, z).
+
 const DISTRICTS: Dictionary = {
-	"downtown": {"color": "#475569", "height_min": 24, "height_max": 80, "ground": "#1a1a1a"},
-	"harbor": {"color": "#1c1917", "height_min": 8, "height_max": 22, "ground": "#171717"},
-	"slums": {"color": "#451a03", "height_min": 5, "height_max": 14, "ground": "#1a0f0a"},
-	"industrial": {"color": "#1f2937", "height_min": 9, "height_max": 24, "ground": "#161616"},
-	"suburbs": {"color": "#525252", "height_min": 4, "height_max": 9, "ground": "#1a2a1a"},
-	"rural": {"color": "#6b5b4a", "height_min": 3, "height_max": 6, "ground": "#2a3a1a"},
+	"downtown": {
+		"color": "#475569", "height_min": 24, "height_max": 80, "ground": "#1a1a1a",
+		"polygon": PackedVector2Array([
+			Vector2(-80, -80), Vector2(80, -80), Vector2(80, 80), Vector2(-80, 80)
+		])
+	},
+	"harbor": {
+		"color": "#1c1917", "height_min": 8, "height_max": 22, "ground": "#171717",
+		"polygon": PackedVector2Array([
+			Vector2(80, -100), Vector2(260, -100), Vector2(260, 180),
+			Vector2(180, 180), Vector2(180, -60), Vector2(80, -60), Vector2(80, 80), Vector2(120, 80)
+		])
+	},
+	"slums": {
+		"color": "#451a03", "height_min": 5, "height_max": 14, "ground": "#1a0f0a",
+		"polygon": PackedVector2Array([
+			Vector2(-180, 40), Vector2(-80, 40), Vector2(-80, 180), Vector2(-180, 180)
+		])
+	},
+	"industrial": {
+		"color": "#1f2937", "height_min": 9, "height_max": 24, "ground": "#161616",
+		"polygon": PackedVector2Array([
+			Vector2(-180, -120), Vector2(-80, -120), Vector2(-80, 40), Vector2(-180, 40)
+		])
+	},
+	"suburbs": {
+		"color": "#525252", "height_min": 4, "height_max": 9, "ground": "#1a2a1a",
+		"polygon": PackedVector2Array([
+			# West suburbs
+			Vector2(-180, -120), Vector2(-80, -120), Vector2(-80, 40), Vector2(-180, 40),
+			# East suburbs (between downtown and harbor)
+			Vector2(80, -80), Vector2(120, -80), Vector2(120, 80), Vector2(80, 80)
+		])
+	},
+	"rural": {
+		"color": "#6b5b4a", "height_min": 3, "height_max": 6, "ground": "#2a3a1a",
+		# Rural is everything outside the city (handled by distance check in get_district_at)
+		"polygon": PackedVector2Array([])
+	},
 }
 
-const CITY_RADIUS = 80.0
+const CITY_RADIUS = 80.0  # legacy — used by terrain_height
 const WORLD_RADIUS = 250.0
 const ROAD_HALF_MAIN = 8.0
 const ROAD_HALF_SIDE = 5.5
 const SIDEWALK = 3.0
 
-# Scheme building positions
+# Water starts at this X coordinate (east edge of city)
+const WATER_X_START = 180.0
+
+# ============================================================
+# SCHEME BUILDINGS — placed at thematic spots per district
+# ============================================================
+# Each building has (x, z) position chosen to fit its district:
+# - Trading Floor, Corporate Tower, Accountant Office, Casino → DOWNTOWN (center)
+# - Trap House, Corner Store, Internet Cafe → SLUMS (SW)
+# - E-Com Warehouse → INDUSTRIAL (NW)
+
 const SCHEME_BUILDINGS: Array = [
-	{"id": "trading", "name": "Trading Floor", "emoji": "📈", "x": -18, "z": -55, "w": 14, "d": 12, "h": 42, "color": "#22d3ee"},
-	{"id": "wirefraud", "name": "Corporate Tower", "emoji": "💸", "x": -50, "z": -30, "w": 18, "d": 16, "h": 80, "color": "#64748b"},
-	{"id": "taxfraud", "name": "Accountant Office", "emoji": "🧾", "x": -30, "z": -18, "w": 12, "d": 10, "h": 24, "color": "#eab308"},
-	{"id": "drugs", "name": "Trap House", "emoji": "💊", "x": 38, "z": -50, "w": 10, "d": 9, "h": 9, "color": "#a855f7"},
-	{"id": "scam", "name": "Internet Cafe", "emoji": "🎣", "x": -38, "z": 30, "w": 9, "d": 8, "h": 7, "color": "#ec4899"},
-	{"id": "robbery", "name": "Corner Store", "emoji": "🔫", "x": -22, "z": 50, "w": 8, "d": 8, "h": 5, "color": "#ef4444"},
-	{"id": "ecom", "name": "E-Com Warehouse", "emoji": "📦", "x": 30, "z": 38, "w": 16, "d": 14, "h": 11, "color": "#4ade80"},
-	{"id": "gambling", "name": "Casino", "emoji": "🎰", "x": 55, "z": 22, "w": 16, "d": 14, "h": 14, "color": "#f59e0b"},
+	# Downtown — financial/entertainment district (center)
+	{"id": "trading", "name": "Trading Floor", "emoji": "📈",
+	 "x": -40, "z": -40, "w": 14, "d": 12, "h": 42, "color": "#22d3ee"},
+	{"id": "wirefraud", "name": "Corporate Tower", "emoji": "💸",
+	 "x": 30, "z": -50, "w": 18, "d": 16, "h": 80, "color": "#64748b"},
+	{"id": "taxfraud", "name": "Accountant Office", "emoji": "🧾",
+	 "x": -60, "z": -10, "w": 12, "d": 10, "h": 24, "color": "#eab308"},
+	{"id": "gambling", "name": "Casino", "emoji": "🎰",
+	 "x": 50, "z": 30, "w": 16, "d": 14, "h": 14, "color": "#f59e0b"},
+	# Slums — drugs/scam/robbery (SW)
+	{"id": "drugs", "name": "Trap House", "emoji": "💊",
+	 "x": -150, "z": 80, "w": 10, "d": 9, "h": 9, "color": "#a855f7"},
+	{"id": "scam", "name": "Internet Cafe", "emoji": "🎣",
+	 "x": -120, "z": 140, "w": 9, "d": 8, "h": 7, "color": "#ec4899"},
+	{"id": "robbery", "name": "Corner Store", "emoji": "🔫",
+	 "x": -160, "z": 150, "w": 8, "d": 8, "h": 5, "color": "#ef4444"},
+	# Industrial — e-com warehouse (NW)
+	{"id": "ecom", "name": "E-Com Warehouse", "emoji": "📦",
+	 "x": -130, "z": -60, "w": 16, "d": 14, "h": 11, "color": "#4ade80"},
 ]
 
-static func get_district_at(x: float, z: float) -> String:
-	var r = sqrt(x * x + z * z)
-	if r > 220:
-		return "rural"
-	if r > CITY_RADIUS:
-		return "suburbs"
-	if x < 0 and z < 0:
-		return "downtown"
-	if x >= 0 and z < 0:
-		return "harbor"
-	if x < 0 and z >= 0:
-		return "slums"
-	return "industrial"
+# ============================================================
+# District lookup (polygon-based)
+# ============================================================
 
+static func get_district_at(x: float, z: float) -> String:
+	var point = Vector2(x, z)
+	# Check each district polygon (order matters — check specific districts first)
+	for district_name in ["downtown", "harbor", "slums", "industrial"]:
+		var district = DISTRICTS[district_name]
+		var polygon = district.get("polygon", PackedVector2Array())
+		if polygon.size() >= 3 and Geometry2D.is_point_in_polygon(point, polygon):
+			return district_name
+	# Suburbs (split into west + east, but stored as one polygon — check separately)
+	if _is_in_suburbs(x, z):
+		return "suburbs"
+	# Everything else is rural
+	return "rural"
+
+static func _is_in_suburbs(x: float, z: float) -> bool:
+	# West suburbs: -180<x<-80, -120<z<40
+	if x > -180 and x < -80 and z > -120 and z < 40:
+		return true
+	# East suburbs (between downtown and harbor): 80<x<120, -80<z<80
+	if x > 80 and x < 120 and z > -80 and z < 80:
+		return true
+	return false
+
+# ============================================================
 # Terrain height function (matching web version)
+# ============================================================
+
 static func terrain_height(x: float, z: float) -> float:
 	var r = sqrt(x * x + z * z)
 	if r < 80:
@@ -94,9 +189,6 @@ static func _fractal_noise(x: float, z: float, octaves: int) -> float:
 		amp *= 0.5
 		freq *= 2
 	return value / max_val
-
-# ============================================================
-# Build everything
 # ============================================================
 static func build_world(parent: Node3D) -> void:
 	_build_terrain(parent)
@@ -169,8 +261,10 @@ static func _build_terrain(parent: Node3D) -> void:
 	parent.add_child(mi)
 
 static func _build_water(parent: Node3D) -> void:
+	# Water plane on the east side of the map (harbor district waterfront)
+	# Spans from x=180 (city edge) to x=600 (map edge)
 	var plane = PlaneMesh.new()
-	plane.size = Vector2(600, 600)
+	plane.size = Vector2(420, 600)  # 420 wide (east), 600 deep (north-south)
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = Color(0.1, 0.29, 0.42, 0.75)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -179,7 +273,8 @@ static func _build_water(parent: Node3D) -> void:
 	plane.material = mat
 	var mi = MeshInstance3D.new()
 	mi.mesh = plane
-	mi.position = Vector3(0, -0.8, 0)
+	# Center the water plane at x = (180 + 600) / 2 = 390
+	mi.position = Vector3(390, -0.8, 0)
 	parent.add_child(mi)
 
 static func _build_roads(parent: Node3D) -> void:
