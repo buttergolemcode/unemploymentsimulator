@@ -339,16 +339,19 @@ static func _build_water(parent: Node3D) -> void:
 
 static func _build_roads(parent: Node3D) -> void:
 	# Streets at every position in STREET_GRID (every 100m)
-	# Each street has: asphalt + 2 raised sidewalks + lane markings
+	# Each street has: asphalt + 2 raised sidewalks (broken at intersections)
+	# + lane markings + crosswalks at intersections
 	for pos in STREET_GRID:
 		# East-West street (along x-axis, at z=pos)
 		_make_street(parent, "x", pos)
 		# North-South street (along z-axis, at x=pos)
 		_make_street(parent, "z", pos)
+	# Add crosswalks at every intersection
+	_build_crosswalks(parent)
 
 static func _make_street(parent: Node3D, axis: String, pos: float) -> void:
 	var length = 800.0  # spans entire city
-	# === ASPHALT (street surface) ===
+	# === ASPHALT (street surface, full length — runs through intersections) ===
 	var asphalt = MeshInstance3D.new()
 	var a_mesh = BoxMesh.new()
 	if axis == "x":
@@ -364,42 +367,118 @@ static func _make_street(parent: Node3D, axis: String, pos: float) -> void:
 	asphalt.material_override = amat
 	parent.add_child(asphalt)
 	
-	# === SIDEWALKS (raised, on both sides) ===
+	# === SIDEWALKS (raised, on both sides, BROKEN at intersections) ===
+	# At each cross-street position, the sidewalk is interrupted so it doesn't
+	# run through the intersection. The gap is filled by a crosswalk (zebra).
 	for side in [-1, 1]:
-		var sidewalk = MeshInstance3D.new()
+		# Build sidewalk in segments between intersections
+		var prev_pos = -length / 2
+		for cross_pos in STREET_GRID:
+			# Segment from prev_pos to (cross_pos - ROAD_HALF_WIDTH - SIDEWALK_WIDTH)
+			var seg_end = cross_pos - ROAD_HALF_WIDTH - SIDEWALK_WIDTH
+			var seg_start = prev_pos
+			var seg_len = seg_end - seg_start
+			if seg_len > 1:
+				_make_sidewalk_segment(parent, axis, pos, side, seg_start, seg_len)
+			# Update prev_pos to skip the intersection gap
+			prev_pos = cross_pos + ROAD_HALF_WIDTH + SIDEWALK_WIDTH
+		# Last segment after final cross street
+		var seg_start = prev_pos
+		var seg_len = (length / 2) - seg_start
+		if seg_len > 1:
+			_make_sidewalk_segment(parent, axis, pos, side, seg_start, seg_len)
+	
+	# === LANE MARKINGS (dashed yellow center line, BROKEN at intersections) ===
+	var dash_spacing = 5.0
+	for cross_idx in range(STREET_GRID.size()):
+		var cross_start = -length / 2 if cross_idx == 0 else STREET_GRID[cross_idx - 1] + ROAD_HALF_WIDTH + 1
+		var cross_end = STREET_GRID[cross_idx] - ROAD_HALF_WIDTH - 1
+		if cross_idx == STREET_GRID.size() - 1:
+			cross_end = length / 2
+		else:
+			# Will continue in next iteration
+			pass
+		# Draw dashes from cross_start to cross_end
+		var seg_len = cross_end - cross_start
+		if seg_len > 1:
+			var count = int(seg_len / dash_spacing)
+			for i in count:
+				var t = cross_start + (i + 0.5) * dash_spacing
+				if t > cross_end:
+					break
+				_make_dash(parent, axis, pos, t)
+
+static func _make_sidewalk_segment(parent: Node3D, axis: String, pos: float,
+		side: int, seg_start: float, seg_len: float) -> void:
+	# Center of segment along the street direction
+	var seg_center = seg_start + seg_len / 2
+	var sidewalk = MeshInstance3D.new()
+	var s_mesh = BoxMesh.new()
+	if axis == "x":
+		s_mesh.size = Vector3(seg_len, SIDEWALK_HEIGHT, SIDEWALK_WIDTH)
+		sidewalk.position = Vector3(seg_center, SIDEWALK_HEIGHT / 2, pos + side * (ROAD_HALF_WIDTH + SIDEWALK_WIDTH / 2))
+	else:
+		s_mesh.size = Vector3(SIDEWALK_WIDTH, SIDEWALK_HEIGHT, seg_len)
+		sidewalk.position = Vector3(pos + side * (ROAD_HALF_WIDTH + SIDEWALK_WIDTH / 2), SIDEWALK_HEIGHT / 2, seg_center)
+	sidewalk.mesh = s_mesh
+	var smat = StandardMaterial3D.new()
+	smat.albedo_color = Color(0.55, 0.55, 0.55)  # light gray NYC concrete
+	smat.roughness = 0.9
+	sidewalk.material_override = smat
+	parent.add_child(sidewalk)
+
+static func _make_dash(parent: Node3D, axis: String, pos: float, t: float) -> void:
+	var dash = MeshInstance3D.new()
+	var d_mesh = BoxMesh.new()
+	if axis == "x":
+		d_mesh.size = Vector3(2.5, 0.01, 0.3)
+		dash.position = Vector3(t, 0.04, pos)
+	else:
+		d_mesh.size = Vector3(0.3, 0.01, 2.5)
+		dash.position = Vector3(pos, 0.04, t)
+	dash.mesh = d_mesh
+	var dmat = StandardMaterial3D.new()
+	dmat.albedo_color = Color(0.95, 0.85, 0.2)
+	dmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	dash.material_override = dmat
+	parent.add_child(dash)
+
+static func _build_crosswalks(parent: Node3D) -> void:
+	# At each intersection (cross of two streets), draw 4 crosswalks
+	# (zebra stripes) across each street leg
+	for x_pos in STREET_GRID:
+		for z_pos in STREET_GRID:
+			# Intersection at (x_pos, z_pos)
+			# 4 crosswalks: north, south, east, west legs
+			# Each crosswalk spans ROAD_HALF_WIDTH*2 wide and ~3m deep
+			_make_crosswalk(parent, x_pos, z_pos - ROAD_HALF_WIDTH - 1.5, "x")  # north leg
+			_make_crosswalk(parent, x_pos, z_pos + ROAD_HALF_WIDTH + 1.5, "x")  # south leg
+			_make_crosswalk(parent, x_pos - ROAD_HALF_WIDTH - 1.5, z_pos, "z")  # west leg
+			_make_crosswalk(parent, x_pos + ROAD_HALF_WIDTH + 1.5, z_pos, "z")  # east leg
+
+static func _make_crosswalk(parent: Node3D, x: float, z: float, axis: String) -> void:
+	# Zebra stripes: white bars across the street
+	var stripe_width = 0.5
+	var stripe_count = 8
+	var stripe_spacing = (ROAD_HALF_WIDTH * 2) / stripe_count
+	for i in range(stripe_count):
+		var offset = (i - (stripe_count - 1) / 2.0) * stripe_spacing
+		var stripe = MeshInstance3D.new()
 		var s_mesh = BoxMesh.new()
 		if axis == "x":
-			s_mesh.size = Vector3(length, SIDEWALK_HEIGHT, SIDEWALK_WIDTH)
-			sidewalk.position = Vector3(0, SIDEWALK_HEIGHT / 2, pos + side * (ROAD_HALF_WIDTH + SIDEWALK_WIDTH / 2))
+			# Crosswalk runs east-west, stripes are perpendicular (along z)
+			s_mesh.size = Vector3(stripe_width, 0.01, 3)
+			stripe.position = Vector3(x + offset, 0.04, z)
 		else:
-			s_mesh.size = Vector3(SIDEWALK_WIDTH, SIDEWALK_HEIGHT, length)
-			sidewalk.position = Vector3(pos + side * (ROAD_HALF_WIDTH + SIDEWALK_WIDTH / 2), SIDEWALK_HEIGHT / 2, 0)
-		sidewalk.mesh = s_mesh
+			# Crosswalk runs north-south, stripes are perpendicular (along x)
+			s_mesh.size = Vector3(3, 0.01, stripe_width)
+			stripe.position = Vector3(x, 0.04, z + offset)
+		stripe.mesh = s_mesh
 		var smat = StandardMaterial3D.new()
-		smat.albedo_color = Color(0.55, 0.55, 0.55)  # light gray sidewalk (NYC concrete)
-		smat.roughness = 0.9
-		sidewalk.material_override = smat
-		parent.add_child(sidewalk)
-	
-	# === LANE MARKINGS (dashed yellow center line) ===
-	var dash_spacing = 5.0
-	var count = int(length / dash_spacing)
-	for i in count:
-		var t = (i - (count - 1) / 2.0) * dash_spacing
-		var dash = MeshInstance3D.new()
-		var d_mesh = BoxMesh.new()
-		if axis == "x":
-			d_mesh.size = Vector3(2.5, 0.01, 0.3)
-			dash.position = Vector3(t, 0.04, pos)
-		else:
-			d_mesh.size = Vector3(0.3, 0.01, 2.5)
-			dash.position = Vector3(pos, 0.04, t)
-		dash.mesh = d_mesh
-		var dmat = StandardMaterial3D.new()
-		dmat.albedo_color = Color(0.95, 0.85, 0.2)
-		dmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		dash.material_override = dmat
-		parent.add_child(dash)
+		smat.albedo_color = Color(0.95, 0.95, 0.95)  # white
+		smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		stripe.material_override = smat
+		parent.add_child(stripe)
 
 # ============================================================
 # Scheme buildings (8 thematic spots)
@@ -809,20 +888,60 @@ static func _build_landmarks(parent: Node3D) -> void:
 	_gas_station(parent, 200, 200)
 
 static func _park(parent: Node3D, x: float, z: float, w: float, d: float) -> void:
+	# Park with clear boundary (sidewalk-style border) like a building block
+	# Grass surface (slightly raised like sidewalk)
 	var grass = MeshInstance3D.new()
 	var g_mesh = BoxMesh.new()
 	g_mesh.size = Vector3(w, 0.1, d)
 	grass.mesh = g_mesh
 	grass.position = Vector3(x, 0.05, z)
 	var gmat = StandardMaterial3D.new()
-	gmat.albedo_color = Color(0.18, 0.35, 0.15)
+	gmat.albedo_color = Color(0.18, 0.35, 0.15)  # green grass
 	gmat.roughness = 1.0
 	grass.material_override = gmat
 	parent.add_child(grass)
+	# Border curb (raised edge around the park, like sidewalk edge)
+	var curb_height = 0.2
+	var curb_width = 0.3
+	var curb_mat = StandardMaterial3D.new()
+	curb_mat.albedo_color = Color(0.5, 0.5, 0.5)  # gray concrete curb
+	curb_mat.roughness = 0.9
+	# 4 curbs (N, S, E, W edges of park)
+	for side in ["N", "S", "E", "W"]:
+		var curb = MeshInstance3D.new()
+		var c_mesh = BoxMesh.new()
+		match side:
+			"N":  # north edge (z = z - d/2)
+				c_mesh.size = Vector3(w, curb_height, curb_width)
+				curb.position = Vector3(x, curb_height / 2, z - d / 2)
+			"S":  # south edge (z = z + d/2)
+				c_mesh.size = Vector3(w, curb_height, curb_width)
+				curb.position = Vector3(x, curb_height / 2, z + d / 2)
+			"E":  # east edge (x = x + w/2)
+				c_mesh.size = Vector3(curb_width, curb_height, d)
+				curb.position = Vector3(x + w / 2, curb_height / 2, z)
+			"W":  # west edge (x = x - w/2)
+				c_mesh.size = Vector3(curb_width, curb_height, d)
+				curb.position = Vector3(x - w / 2, curb_height / 2, z)
+		curb.mesh = c_mesh
+		curb.material_override = curb_mat
+		parent.add_child(curb)
+	# Trees scattered inside park (with margin from curb)
+	var margin = 4.0
 	for i in range(8):
-		var tx = x + (randf() - 0.5) * w * 0.8
-		var tz = z + (randf() - 0.5) * d * 0.8
+		var tx = x + (randf() - 0.5) * (w - margin * 2)
+		var tz = z + (randf() - 0.5) * (d - margin * 2)
 		_make_tree(parent, tx, tz, 0.8 + randf() * 0.5)
+	# Park label
+	var label = Label3D.new()
+	label.text = "🌳 PARK"
+	label.position = Vector3(x, 2, z)
+	label.font_size = 36
+	label.outline_size = 6
+	label.outline_modulate = Color.BLACK
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	parent.add_child(label)
 
 static func _skyscraper(parent: Node3D, x: float, z: float, w: float, h: float, color: String) -> void:
 	var mesh = MeshInstance3D.new()
