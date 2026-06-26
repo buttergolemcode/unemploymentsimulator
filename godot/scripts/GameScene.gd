@@ -65,16 +65,19 @@ func _spawn_vehicles():
 		# Collision
 		var col = CollisionShape3D.new()
 		var shape = BoxShape3D.new()
-		# Vehicle collision: CapsuleShape (rounded bottom slides over sidewalk steps)
-		# NOTE: CapsuleShape3D.height is the CYLINDER part only. Total height = height + 2*radius.
-		# We want total ~1.6m, with rounded bottom at y=0 (ground level).
-		# radius=0.8 (close to half car width 0.95), height=0.0 (pure sphere shape)
-		# -> total height = 0 + 2*0.8 = 1.6m, center at y=0.8, bottom at y=0.0
+		# Vehicle collision: CapsuleShape oriented along Z (car length axis)
+		# CapsuleShape3D is oriented along Y by default. We rotate it 90° on X
+		# so it lies along Z (matching car length). Now it's long enough to
+		# cover the full car body, with rounded front/back edges.
+		# radius=0.8 (car half-height), height=2.9 (cylinder part = car length - 2*radius)
+		# Total length = 2.9 + 2*0.8 = 4.5m (matches car body length)
+		# Total height = 2*0.8 = 1.6m (matches car body height ~1.4m)
 		var capsule = CapsuleShape3D.new()
 		capsule.radius = 0.8
-		capsule.height = 0.0  # sphere shape (no cylinder part) — simplest rounded form
+		capsule.height = 2.9  # cylinder part (total = 2.9 + 1.6 = 4.5m along Z)
 		col.shape = capsule
-		col.position = Vector3(0, 0.8, 0)  # center at y=0.8, bottom at y=0.0
+		col.position = Vector3(0, 0.8, 0)  # center at y=0.8
+		col.rotation.x = PI / 2  # rotate capsule from Y-axis to Z-axis (lie flat)
 		vehicle.add_child(col)
 		
 		# Mesh container
