@@ -65,12 +65,14 @@ func _spawn_vehicles():
 		# Collision
 		var col = CollisionShape3D.new()
 		var shape = BoxShape3D.new()
-		# Vehicle collision box — bottom at y=0.05 (matches sidewalk collision top)
-		# This lets the car slide horizontally onto sidewalks without hitting
-		# a vertical step. Box bottom = sidewalk collision top = 0.05m.
-		shape.size = Vector3(1.9, 1.4, 4.3)
-		col.shape = shape
-		col.position = Vector3(0, 0.75, 0)  # center at y=0.75, bottom at y=0.05
+		# Vehicle collision: CapsuleShape (rounded bottom slides over sidewalk steps)
+		# BoxShape has flat bottom that catches on vertical lips. CapsuleShape
+		# has rounded bottom like player — slides over small steps reliably.
+		var capsule = CapsuleShape3D.new()
+		capsule.radius = 1.0  # 1m radius (matches car half-width)
+		capsule.height = 2.5  # 2.5m tall capsule (cylinder part 0.5m + 2x radius)
+		col.shape = capsule
+		col.position = Vector3(0, 1.0, 0)  # center at y=1.0, bottom at y=0.0
 		vehicle.add_child(col)
 		
 		# Mesh container
