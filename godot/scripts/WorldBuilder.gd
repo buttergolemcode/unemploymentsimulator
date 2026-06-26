@@ -186,6 +186,7 @@ static func build_world(parent: Node3D) -> void:
 	_build_filler_buildings(parent)
 	_build_street_lamps(parent)
 	_build_dock_props(parent)
+	_build_landmarks(parent)
 
 # ============================================================
 # Terrain (flat island)
@@ -250,13 +251,59 @@ static func _build_terrain(parent: Node3D) -> void:
 	mat.roughness = 0.95
 	mi.material_override = mat
 	
-	# Collision: flat ground plane covering the whole island
-	var body = StaticBody3D.new()
-	var col = CollisionShape3D.new()
-	var shape = WorldBoundaryShape3D.new()
-	col.shape = shape
-	body.add_child(col)
-	parent.add_child(body)
+	# === COLLISION: Multi-part system ===
+	# 1) City ground (flat BoxShape3D covering the city area)
+	var city_body = StaticBody3D.new()
+	city_body.name = "CityGround"
+	var city_col = CollisionShape3D.new()
+	var city_shape = BoxShape3D.new()
+	city_shape.size = Vector3(900, 1.0, 900)  # 900x900 flat ground at y=-0.5
+	city_col.shape = city_shape
+	city_col.position = Vector3(0, -0.5, 0)
+	city_body.add_child(city_col)
+	parent.add_child(city_body)
+	
+	# 2) Mountain walls (N and S) - tall boxes that block vehicle passage
+	# North mountain wall (z < -400)
+	var north_body = StaticBody3D.new()
+	north_body.name = "MountainNorth"
+	var north_col = CollisionShape3D.new()
+	var north_shape = BoxShape3D.new()
+	north_shape.size = Vector3(1200, 80, 200)  # 1200 wide, 80 tall, 200 deep
+	north_col.shape = north_shape
+	north_col.position = Vector3(0, 40, -500)  # centered at z=-500, 40 high
+	north_body.add_child(north_col)
+	parent.add_child(north_body)
+	# South mountain wall (z > 400)
+	var south_body = StaticBody3D.new()
+	south_body.name = "MountainSouth"
+	var south_col = CollisionShape3D.new()
+	var south_shape = BoxShape3D.new()
+	south_shape.size = Vector3(1200, 80, 200)
+	south_col.shape = south_shape
+	south_col.position = Vector3(0, 40, 500)
+	south_body.add_child(south_col)
+	parent.add_child(south_body)
+	# West mountain wall (x < -400)
+	var west_body = StaticBody3D.new()
+	west_body.name = "MountainWest"
+	var west_col = CollisionShape3D.new()
+	var west_shape = BoxShape3D.new()
+	west_shape.size = Vector3(200, 80, 1200)
+	west_col.shape = west_shape
+	west_col.position = Vector3(-500, 40, 0)
+	west_body.add_child(west_col)
+	parent.add_child(west_body)
+	# East harbor wall (water barrier at x > 400) - lower, blocks ground vehicles
+	var east_body = StaticBody3D.new()
+	east_body.name = "HarborBarrier"
+	var east_col = CollisionShape3D.new()
+	var east_shape = BoxShape3D.new()
+	east_shape.size = Vector3(50, 3, 1200)  # low wall, blocks cars but visible over
+	east_col.shape = east_shape
+	east_col.position = Vector3(425, 1.5, 0)  # at x=425, 1.5 high
+	east_body.add_child(east_col)
+	parent.add_child(east_body)
 	
 	parent.add_child(mi)
 
@@ -410,21 +457,22 @@ static func _build_scheme_buildings(parent: Node3D) -> void:
 
 static func _build_filler_buildings(parent: Node3D) -> void:
 	# Place buildings on a grid, skipping roads and scheme-building areas
-	var grid = 25  # 25m grid spacing
-	var half = 350  # cover city area
+	# Dense layout: 15m grid (was 25m), smaller gaps, bigger buildings
+	var grid = 15  # 15m grid spacing (denser than 25m)
+	var half = 380  # cover city area
 	for gx in range(-half, half + 1, grid):
 		for gz in range(-half, half + 1, grid):
 			var cx = gx + grid / 2.0
 			var cz = gz + grid / 2.0
 			var r = sqrt(cx * cx + cz * cz)
-			if r > 380:
-				continue  # outside island
+			if r > 390:
+				continue  # outside city
 			if _is_on_road(cx, cz):
 				continue
 			# Skip near scheme buildings
 			var too_close = false
 			for b in SCHEME_BUILDINGS:
-				if sqrt((cx - b.x) ** 2 + (cz - b.z) ** 2) < max(b.w, b.d) / 2 + 6:
+				if sqrt((cx - b.x) ** 2 + (cz - b.z) ** 2) < max(b.w, b.d) / 2 + 4:
 					too_close = true
 					break
 			if too_close:
@@ -438,45 +486,45 @@ static func _build_filler_buildings(parent: Node3D) -> void:
 			var seed_val = abs((gx * 73856093) ^ (gz * 19349663)) % 99991
 			var rng = func(salt): return float((seed_val * (salt + 1) * 9301 + 49297) % 233280) / 233280
 			
-			# Gap chance (per district — downtown dense, suburbs sparse)
-			var gap = 0.15
+			# Gap chance — REDUCED for higher density
+			var gap = 0.10
 			match dist_id:
-				"downtown": gap = 0.10
-				"harbor": gap = 0.40
-				"slums": gap = 0.20
-				"industrial": gap = 0.30
-				"suburbs": gap = 0.50
+				"downtown": gap = 0.05  # very dense (was 0.10)
+				"harbor": gap = 0.25    # (was 0.40)
+				"slums": gap = 0.10     # (was 0.20)
+				"industrial": gap = 0.20  # (was 0.30)
+				"suburbs": gap = 0.35   # (was 0.50)
 			if rng.call(99) < gap:
 				continue
 			
-			# Building dimensions per district
+			# Building dimensions per district — BIGGER for better fill
 			var w: float
 			var d: float
 			var h: float
 			var dist = DISTRICTS[dist_id]
 			if dist_id == "downtown":
-				w = 12 + rng.call(1) * 8
-				d = 10 + rng.call(2) * 8
+				w = 10 + rng.call(1) * 4  # 10-14m (was 12-20)
+				d = 9 + rng.call(2) * 4
 				h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
 			elif dist_id == "industrial":
-				w = 14 + rng.call(1) * 10
-				d = 12 + rng.call(2) * 8
+				w = 11 + rng.call(1) * 4
+				d = 10 + rng.call(2) * 4
 				h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
 			elif dist_id == "harbor":
-				w = 16 + rng.call(1) * 10
-				d = 14 + rng.call(2) * 8
+				w = 12 + rng.call(1) * 4
+				d = 11 + rng.call(2) * 4
 				h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
 			elif dist_id == "slums":
-				w = 8 + rng.call(1) * 5
-				d = 7 + rng.call(2) * 5
+				w = 7 + rng.call(1) * 4
+				d = 6 + rng.call(2) * 4
 				h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
 			else:  # suburbs
-				w = 8 + rng.call(1) * 4
-				d = 7 + rng.call(2) * 4
+				w = 7 + rng.call(1) * 3
+				d = 6 + rng.call(2) * 3
 				h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
 			
-			# Offset within grid cell
-			var margin = 2.0
+			# Offset within grid cell (small, to fill the cell tightly)
+			var margin = 1.0
 			var max_off = max(0, (grid - w - margin * 2) / 2)
 			var ox = (rng.call(4) - 0.5) * max_off
 			var oz = (rng.call(5) - 0.5) * max_off
@@ -643,3 +691,216 @@ static func _build_street_lamps(parent: Node3D) -> void:
 		light.light_energy = 2.0
 		light.omni_range = 12.0
 		parent.add_child(light)
+
+# ============================================================
+# Landmarks (visual points of interest)
+# ============================================================
+
+static func _build_landmarks(parent: Node3D) -> void:
+	# 1. Central Park (large green area in downtown-south)
+	_park(parent, -50, 100, 80, 50)
+	# 2. Skyline / Skyscraper row (3 tall towers in downtown-east)
+	_skyscraper(parent, 150, -100, 12, 90, "#1e293b")
+	_skyscraper(parent, 175, -100, 12, 110, "#0f172a")
+	_skyscraper(parent, 200, -100, 12, 95, "#1e293b")
+	# 3. Bridge connecting harbor piers
+	_bridge(parent, 250, 0, 0)  # bridge at harbor entrance
+	# 4. Fortress on west hill (rural area, visible from far)
+	_fortress(parent, -300, -300)
+	# 5. Stadium (in industrial/suburbs border)
+	_stadium(parent, -250, 100)
+	# 6. Church tower in downtown center
+	_church_tower(parent, 0, 0)
+	# 7. Bus station (downtown-east, near main avenue)
+	_bus_station(parent, 100, 150)
+	# 8. Gas station (industrial, near highway)
+	_gas_station(parent, -200, -200)
+	_gas_station(parent, 200, 200)  # second one in slums/harbor border
+
+static func _park(parent: Node3D, x: float, z: float, w: float, d: float) -> void:
+	# Green park area with trees
+	var grass = MeshInstance3D.new()
+	var g_mesh = BoxMesh.new()
+	g_mesh.size = Vector3(w, 0.1, d)
+	grass.mesh = g_mesh
+	grass.position = Vector3(x, 0.05, z)
+	var gmat = StandardMaterial3D.new()
+	gmat.albedo_color = Color(0.18, 0.35, 0.15)
+	gmat.roughness = 1.0
+	grass.material_override = gmat
+	parent.add_child(grass)
+	# Trees scattered in park
+	for i in range(8):
+		var tx = x + (randf() - 0.5) * w * 0.8
+		var tz = z + (randf() - 0.5) * d * 0.8
+		_make_tree(parent, tx, tz, 0.8 + randf() * 0.5)
+
+static func _skyscraper(parent: Node3D, x: float, z: float, w: float, h: float, color: String) -> void:
+	var mesh = MeshInstance3D.new()
+	var s_mesh = BoxMesh.new()
+	s_mesh.size = Vector3(w, h, w)
+	mesh.mesh = s_mesh
+	mesh.position = Vector3(x, h / 2, z)
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color.from_string(color, Color.DIM_GRAY)
+	mat.metalness = 0.7
+	mat.roughness = 0.2
+	# Emissive windows look
+	mat.emission_enabled = true
+	mat.emission = Color(0.4, 0.5, 0.6)
+	mat.emission_energy_multiplier = 0.15
+	mesh.material_override = mat
+	parent.add_child(mesh)
+	# Collision
+	var body = StaticBody3D.new()
+	body.position = Vector3(x, h / 2, z)
+	var col = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+	shape.size = Vector3(w, h, w)
+	col.shape = shape
+	body.add_child(col)
+	parent.add_child(body)
+
+static func _bridge(parent: Node3D, x: float, z: float, _rot: float) -> void:
+	# Bridge spanning harbor entrance
+	var deck = MeshInstance3D.new()
+	var d_mesh = BoxMesh.new()
+	d_mesh.size = Vector3(60, 1, 8)
+	deck.mesh = d_mesh
+	deck.position = Vector3(x, 5, z)
+	var dmat = StandardMaterial3D.new()
+	dmat.albedo_color = Color(0.3, 0.3, 0.3)
+	dmat.roughness = 0.9
+	deck.material_override = dmat
+	parent.add_child(deck)
+	# Suspension towers
+	for tx in [x - 25, x + 25]:
+		var tower = MeshInstance3D.new()
+		var t_mesh = BoxMesh.new()
+		t_mesh.size = Vector3(2, 12, 2)
+		tower.mesh = t_mesh
+		tower.position = Vector3(tx, 6, z)
+		tower.material_override = dmat
+		parent.add_child(tower)
+
+static func _fortress(parent: Node3D, x: float, z: float) -> void:
+	# Stone fortress on a hill
+	var stone = StandardMaterial3D.new()
+	stone.albedo_color = Color(0.45, 0.4, 0.35)
+	stone.roughness = 0.95
+	# Main keep
+	var keep = MeshInstance3D.new()
+	var k_mesh = BoxMesh.new()
+	k_mesh.size = Vector3(15, 18, 15)
+	keep.mesh = k_mesh
+	keep.position = Vector3(x, 9, z)
+	keep.material_override = stone
+	parent.add_child(keep)
+	# Corner towers
+	for offset in [Vector2(-10, -10), Vector2(10, -10), Vector2(-10, 10), Vector2(10, 10)]:
+		var tower = MeshInstance3D.new()
+		var t_mesh = CylinderMesh.new()
+		t_mesh.top_radius = 2.5
+		t_mesh.bottom_radius = 3
+		t_mesh.height = 22
+		tower.mesh = t_mesh
+		tower.position = Vector3(x + offset.x, 11, z + offset.y)
+		tower.material_override = stone
+		parent.add_child(tower)
+
+static func _stadium(parent: Node3D, x: float, z: float) -> void:
+	# Oval stadium — represented as a ring of boxes
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.55, 0.55, 0.55)
+	mat.roughness = 0.85
+	for i in range(24):
+		var angle = i * TAU / 24
+		var px = x + cos(angle) * 35
+		var pz = z + sin(angle) * 25
+		var stand = MeshInstance3D.new()
+		var s_mesh = BoxMesh.new()
+		s_mesh.size = Vector3(10, 12, 8)
+		stand.mesh = s_mesh
+		stand.position = Vector3(px, 6, pz)
+		stand.rotation.y = angle
+		stand.material_override = mat
+		parent.add_child(stand)
+
+static func _church_tower(parent: Node3D, x: float, z: float) -> void:
+	# Tall church tower in downtown
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.85, 0.8, 0.7)
+	mat.roughness = 0.9
+	# Tower base
+	var base = MeshInstance3D.new()
+	var b_mesh = BoxMesh.new()
+	b_mesh.size = Vector3(8, 30, 8)
+	base.mesh = b_mesh
+	base.position = Vector3(x, 15, z)
+	base.material_override = mat
+	parent.add_child(base)
+	# Spire on top
+	var spire = MeshInstance3D.new()
+	var s_mesh = PrismMesh.new()
+	s_mesh.size = Vector3(6, 12, 6)
+	spire.mesh = s_mesh
+	spire.position = Vector3(x, 36, z)
+	spire.material_override = mat
+	parent.add_child(spire)
+
+static func _bus_station(parent: Node3D, x: float, z: float) -> void:
+	# Flat-roof bus station building
+	var mesh = MeshInstance3D.new()
+	var b_mesh = BoxMesh.new()
+	b_mesh.size = Vector3(20, 6, 12)
+	mesh.mesh = b_mesh
+	mesh.position = Vector3(x, 3, z)
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.7, 0.7, 0.7)
+	mat.roughness = 0.8
+	mesh.material_override = mat
+	parent.add_child(mesh)
+	# Sign
+	var sign = Label3D.new()
+	sign.text = "🚌 BUS"
+	sign.position = Vector3(x, 7, z)
+	sign.font_size = 48
+	sign.outline_size = 6
+	sign.outline_modulate = Color.BLACK
+	sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sign.no_depth_test = true
+	parent.add_child(sign)
+
+static func _gas_station(parent: Node3D, x: float, z: float) -> void:
+	# Small gas station with canopy
+	var canopy = MeshInstance3D.new()
+	var c_mesh = BoxMesh.new()
+	c_mesh.size = Vector3(12, 0.5, 8)
+	canopy.mesh = c_mesh
+	canopy.position = Vector3(x, 5, z)
+	var cmat = StandardMaterial3D.new()
+	cmat.albedo_color = Color(0.2, 0.2, 0.2)
+	cmat.roughness = 0.7
+	canopy.material_override = cmat
+	parent.add_child(canopy)
+	# Canopy supports
+	for sx in [x - 5, x + 5]:
+		for sz in [z - 3, z + 3]:
+			var post = MeshInstance3D.new()
+			var p_mesh = BoxMesh.new()
+			p_mesh.size = Vector3(0.3, 5, 0.3)
+			post.mesh = p_mesh
+			post.position = Vector3(sx, 2.5, sz)
+			post.material_override = cmat
+			parent.add_child(post)
+	# Small shop building
+	var shop = MeshInstance3D.new()
+	var s_mesh = BoxMesh.new()
+	s_mesh.size = Vector3(6, 4, 5)
+	shop.mesh = s_mesh
+	shop.position = Vector3(x + 10, 2, z)
+	var smat = StandardMaterial3D.new()
+	smat.albedo_color = Color(0.85, 0.85, 0.85)
+	smat.roughness = 0.85
+	shop.material_override = smat
+	parent.add_child(shop)
