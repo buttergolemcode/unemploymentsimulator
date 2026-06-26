@@ -120,10 +120,26 @@
 | 012 | meta-system | Meta-Based Tagging | scheme_id/name/emoji via set_meta() | 2026-06-27 | ✅ |
 | 012 | meta-system | Collision Layer Separation | NPCs layer 3 mask 1, vehicles pass through | 2026-06-27 | ✅ |
 | 012 | meta-system | Static Data Registries | SchemeData, EventData, VehicleData, WorldBuilder (class_name) | 2026-06-27 | ✅ |
-| — | D.4-map-layout | NYC Grid Redesign | 1200×1200m, 7 avenues, 100m blocks | 2026-06-27 | 🔄 |
-| — | D.4-map-layout | Sidewalk Collision | 5cm collision, floor_snap kompatibel | 2026-06-27 | 🔄 |
-| — | D.4-map-layout | Real Harbor | Basin, Piers, Ships, Container, Cranes | 2026-06-27 | 🔄 |
-| — | D.4-map-layout | Rural Collision | 50m Grid, terrain-matching | 2026-06-27 | 🔄 |
+| — | D.4-map-layout | NYC Grid Redesign | 1200×1200m, 7 avenues, 100m blocks | 2026-06-27 | ✅ |
+| — | D.4-map-layout | Sidewalk Collision | 5cm collision, floor_snap kompatibel | 2026-06-27 | ✅ |
+| — | D.4-map-layout | Real Harbor | Basin, Piers, Ships, Container, Cranes | 2026-06-27 | ✅ |
+| — | D.4-map-layout | Rural Collision | 50m Grid, terrain-matching | 2026-06-27 | ✅ |
+| — | D.4.5-styling | Kenney Building Integration | Replace BoxMesh mit Kenney GLB pro District | — | ⬜ |
+| — | D.4.5-styling | Vehicle Styling | Quaternius Cars in Blender anpassen (custom colors, arcade proportions) | — | ⬜ |
+| — | D.4.5-styling | Character Styling | Quaternius Characters in Blender anpassen (outfits, proportions) | — | ⬜ |
+| — | D.4.5-styling | Tree/Prop Styling | Replace procedural trees/props mit styled Models | — | ⬜ |
+| — | D.4.5-styling | Landmark Styling | Replace box landmarks mit styled versions | — | ⬜ |
+| — | D.4.5-styling | Harbor Styling | Replace box ships/containers/cranes mit styled versions | — | ⬜ |
+| — | D.4.5-styling | Mountain Terrain | Real mountain geometry (peaks/ridges, not box walls) | — | ⬜ |
+| — | D.4.5-styling | Forest Zones | Dense tree coverage in rural/suburb borders | — | ⬜ |
+| — | D.4.5-styling | Highway System | Highway roads to map edges (guardrails, signage) | — | ⬜ |
+| — | D.4.5-styling | Rural Areas | Farms, barns, fields, dirt roads (not empty hills) | — | ⬜ |
+| — | D.4.5-styling | Coastline | Beach/shore transition where land meets water | — | ⬜ |
+| — | D.4.5-styling | District Borders | Natural transitions (rivers, parks, elevation) | — | ⬜ |
+| — | D.4.5-styling | Suburb Design | Residential streets (gardens, fences, houses) | — | ⬜ |
+| — | D.4.5-styling | Slum Alleyways | Dense narrow alleyways (not just smaller grid) | — | ⬜ |
+| — | D.4.5-styling | Color Palette | Cohesive desaturated palette with neon accents | — | ⬜ |
+| — | D.4.5-styling | Material Style | Flat colors, subtle roughness, not PBR | — | ⬜ |
 | — | D.5-animations | NPC Walk Animations | Universal Animation Library (pending download) | — | ⬜ |
 | — | D.5-animations | Vehicle Wheel Spin (FBX) | Spin-pivot Node3D für FBX-Räder | — | ⬜ |
 | — | D.5-animations | Player Walk/Run Anim | Walk, Run, Idle, Enter/Exit Vehicle | — | ⬜ |

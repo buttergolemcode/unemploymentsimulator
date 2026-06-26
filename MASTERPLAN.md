@@ -142,44 +142,63 @@ Replace box-mesh vehicles with real Quaternius car models. Add wheel-spin, front
 - Fallback to capsule mesh if FBX missing
 - Source: Quaternius Ultimate Modular Characters Pack (CC0, FBX format)
 
-#### D.4 — Map layout redesign (logical city) ⬅️ NEXT
-Replace the current radial grid with a designed city plan. This comes FIRST
-because all subsequent steps (buildings, roads, props) need to fit into a
-defined layout — otherwise we'd be placing assets twice.
+#### D.4 — Map layout redesign (functional grid) ✅
+NYC-style grid with 1200×1200m playable area, 6 districts, sidewalks with collision,
+crosswalks, harbor, rural zone, mountain walls. Functional but uses procedural box
+placeholders for buildings/props/trees. Collision works (cars can drive on sidewalks).
 
-```
-                NORTH (forests, hills)
-                        |
-    SUBURBS    |    SUBURBS
-       \       |       /
-        \      |      /
-   INDUSTRIAL --+-- HARBOR (waterfront, east)
-        /      |      \
-       /       |       \
-    SLUMS  -- DOWNTOWN -- (highway exit east)
-                        |
-                  SOUTH (highway, rural)
-```
+**Known Issues (to be fixed in D.4.5 or D.5):**
+- Vehicle wheels visually glitch when driving over sidewalk (collision works, visual doesn't follow)
+- Buildings are colored BoxMeshes (not real CC0 assets yet)
+- Trees, landmarks, harbor props are procedural primitives
 
-- Water on east edge (harbor district with docks)
-- Highway rings the city (with exits to downtown)
-- Each district has clear borders (river, highway, or greenbelt)
-- Districts sized to actual gameplay needs (downtown large for trading, slums small for drug deals, etc.)
-- Define district polygons (Vector2 arrays) used by all later steps
-- 8 scheme buildings placed at thematic spots:
-  - Trading Floor → downtown financial district
-  - Corporate Tower (wirefraud) → downtown
-  - Accountant Office (taxfraud) → downtown side street
-  - Trap House (drugs) → slums
-  - Internet Cafe (scam) → slums/industrial border
-  - Corner Store (robbery) → slums
-  - E-Com Warehouse (ecom) → industrial
-  - Casino (gambling) → downtown entertainment strip
-- Update `WorldBuilder.gd` to use new layout (district polygons + scheme positions)
-- Acceptance: City outline visible, districts color-coded on minimap (later), scheme buildings at correct thematic spots
+#### D.4.5 — Map Design Finish & Asset Styling ⬅️ NEXT
+Replace ALL procedural placeholders with styled CC0 assets and finish the complete
+map design — including everything outside the big city.
 
-#### D.5 — Animations (NPCs, vehicles, player) ⬅️ AFTER MAP LAYOUT
-Add real animations to replace current procedural hacks.
+**Asset Integration (replace box placeholders):**
+- Buildings: Replace BoxMesh buildings with Kenney GLB modular buildings per district
+- Vehicles: Style Quaternius Cars in Blender (custom colors, unique look)
+- Characters: Style Quaternius Modular Characters in Blender (custom outfits, proportions)
+- Trees: Replace procedural (cylinder+prism) with styled tree models
+- Landmarks: Replace box landmarks with styled versions (bridge, fortress, stadium, etc.)
+- Harbor: Replace box ships/containers/cranes with styled versions
+- Street props: Replace box lamps with KayKit prop models
+
+**Map Design Finish (everything outside big city):**
+- Mountains: Real mountain geometry (not just box walls) — visible terrain with peaks/ridges
+- Forests: Dense tree coverage in rural/suburb border zones (not just scattered trees)
+- Highways: Highway roads connecting city to map edges (with guardrails, signage)
+- Rural areas: Farms, barns, fields, dirt roads — not just empty green hills
+- Coastline: Beach/shore where land meets water (not just a hard edge)
+- District borders: Natural transitions (rivers, parks, elevation changes) between districts
+- Suburbs: Residential streets with houses, gardens, fences — not just city-grid extension
+- Slums: Dense narrow alleyways, not just smaller buildings on the same grid
+
+**Style Guide (unique game look, not raw CC0):**
+- Define a cohesive color palette (desaturated, slightly gritty, neon accents at night)
+- Material treatment: flat colors with subtle roughness variation (not realistic PBR)
+- Vehicle style: matte paint, slightly夸张 proportions (arcade feel)
+- Character style: slightly stylized proportions (bigger heads, shorter limbs — Saints Row vibe)
+- Building style: flat facades with bold color blocks, minimal texture detail
+- Overall: "Low-poly stylized with attitude" — not generic CC0, not realistic
+
+**Acceptance:**
+- [ ] No procedural box placeholders visible anywhere in the world
+- [ ] All buildings use styled CC0 models (Kenney base, custom materials)
+- [ ] Mountains are real terrain (not box walls)
+- [ ] Forests are dense and visible from city edge
+- [ ] Rural area has farms/barns/fields (not empty hills)
+- [ ] Coastline has beach/shore transition
+- [ ] District borders feel natural (not hard polygon edges)
+- [ ] Suburbs look residential (gardens, fences, houses)
+- [ ] Slums have narrow alleyways (not just smaller grid buildings)
+- [ ] Vehicle/character models have unique style (not raw CC0)
+- [ ] Color palette is cohesive across all assets
+- [ ] Map feels like a real city with surroundings, not a grid on flat ground
+
+#### D.5 — Animations (NPCs, vehicles, player) ⬅️ AFTER MAP DESIGN FINISH
+Add real animations to replace current procedural hacks. Builds on D.4.5 styled models.
 
 **NPC animations:**
 - Get Quaternius Universal Animation Library (CC0) — currently blocked by itch.io purchase flow, user may need to download manually
@@ -271,16 +290,20 @@ Add real animations to replace current procedural hacks.
 - Distant fog over water for horizon blend
 
 #### D.11 — Sprint D acceptance test
-- [ ] All 8 scheme buildings use real CC0 models
-- [ ] All vehicles use Quaternius car models (not boxes)
+- [ ] All 8 scheme buildings use styled CC0 models
+- [ ] All vehicles use styled Quaternius car models (not boxes)
 - [ ] All NPCs use animated character models with real walk animation
-- [ ] Player has a real character model with walk/run animations
+- [ ] Player has a styled character model with walk/run animations
 - [ ] City has 6 visually distinct districts arranged in logical layout
 - [ ] Road network is logically laid out (not random grid)
 - [ ] Street props distributed naturally
 - [ ] Per-district lighting makes each area feel different
 - [ ] Vehicle wheels visibly spin and steer
 - [ ] No placeholder boxes visible anywhere in the world
+- [ ] Mountains are real terrain (not box walls)
+- [ ] Forests, rural areas, coastline are designed (not empty)
+- [ ] District borders feel natural (not hard polygon edges)
+- [ ] Color palette is cohesive across all assets
 - [ ] FPS stays above 60 on target hardware
 
 ### Sprint E — Sound & Atmosphere ⬅️ NEXT AFTER D
