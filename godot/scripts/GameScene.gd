@@ -90,19 +90,19 @@ func _spawn_vehicles():
 func _spawn_npcs():
 	# Merchants near scheme buildings (positions match new D.4 v2 layout)
 	var merchant_positions = [
-		# Downtown merchants (financial district)
-		{"x": -90, "z": -45, "color": "#16a34a", "district": "downtown"},
-		{"x": 110, "z": -75, "color": "#16a34a", "district": "downtown"},
-		{"x": -140, "z": 55, "color": "#16a34a", "district": "downtown"},
-		{"x": 130, "z": 95, "color": "#16a34a", "district": "downtown"},
-		# Slums merchants (drugs/scam/robbery)
-		{"x": -290, "z": 275, "color": "#b91c1c", "district": "slums"},
-		{"x": -240, "z": 325, "color": "#b91c1c", "district": "slums"},
-		{"x": -320, "z": 345, "color": "#b91c1c", "district": "slums"},
-		# Industrial merchant (e-com)
-		{"x": -270, "z": -245, "color": "#d97706", "district": "industrial"},
-		# Harbor merchant
-		{"x": 230, "z": 0, "color": "#7e22ce", "district": "harbor"},
+		# Downtown merchants (financial district, +100..+800 X)
+		{"x": 280, "z": -80, "color": "#16a34a", "district": "downtown"},
+		{"x": 480, "z": 80, "color": "#16a34a", "district": "downtown"},
+		{"x": 180, "z": 180, "color": "#16a34a", "district": "downtown"},
+		{"x": 580, "z": -180, "color": "#16a34a", "district": "downtown"},
+		# Slums merchants (container-slum, +50..+300 X, +300..+800 Z)
+		{"x": 90, "z": 480, "color": "#b91c1c", "district": "slums"},
+		{"x": 40, "z": 580, "color": "#b91c1c", "district": "slums"},
+		{"x": 140, "z": 530, "color": "#b91c1c", "district": "slums"},
+		# Industrial merchant (e-com, -600..+200 X)
+		{"x": -220, "z": -80, "color": "#d97706", "district": "industrial"},
+		# Harbor merchant (waterfront, +600..+1500 X)
+		{"x": 900, "z": 0, "color": "#7e22ce", "district": "harbor"},
 	]
 	for mp in merchant_positions:
 		_spawn_npc(mp.x, mp.z, mp.color, mp.district, true)
@@ -156,14 +156,14 @@ func _spawn_npc_in_district(district: String, color: String):
 		return
 
 func _get_district_bounds(d: String) -> Array:
-	# Bounds match D.4 v2 island layout (x_min, x_max, z_min, z_max)
+	# Bounds match D.4.5a Kustenstadt layout (x_min, x_max, z_min, z_max)
 	match d:
-		"downtown": return [-200, 200, -150, 200]
-		"harbor": return [200, 400, -300, 300]
-		"slums": return [-400, -150, 200, 400]
-		"industrial": return [-400, -150, -400, -100]
-		"suburbs": return [-400, -150, -100, 200]
-		_: return [-380, 380, -380, 380]  # rural + water
+		"downtown": return [100, 800, -500, 500]
+		"harbor": return [600, 1500, -600, 600]
+		"slums": return [50, 300, 300, 800]
+		"industrial": return [-600, 200, -500, 500]
+		"suburbs": return [-1000, -400, -500, 500]
+		_: return [-1200, -800, -1200, 1200]  # rural
 
 func _process(delta):
 	elapsed_time += delta
