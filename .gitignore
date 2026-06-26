@@ -80,3 +80,5 @@ bundle/
 Thumbs.db
 desktop.ini
 tool-results/
+*.html
+!index.html
