@@ -29,47 +29,51 @@ extends RefCounted
 #
 # Each district polygon defines its boundary as Vector2 points (x, z).
 
-const DISTRICTS: Dictionary = {
-	"downtown": {
-		"color": "#475569", "height_min": 24, "height_max": 80, "ground": "#1a1a1a",
-		"polygon": PackedVector2Array([
-			Vector2(-80, -80), Vector2(80, -80), Vector2(80, 80), Vector2(-80, 80)
-		])
-	},
-	"harbor": {
-		"color": "#1c1917", "height_min": 8, "height_max": 22, "ground": "#171717",
-		"polygon": PackedVector2Array([
-			Vector2(80, -100), Vector2(260, -100), Vector2(260, 180),
-			Vector2(180, 180), Vector2(180, -60), Vector2(80, -60), Vector2(80, 80), Vector2(120, 80)
-		])
-	},
-	"slums": {
-		"color": "#451a03", "height_min": 5, "height_max": 14, "ground": "#1a0f0a",
-		"polygon": PackedVector2Array([
-			Vector2(-180, 40), Vector2(-80, 40), Vector2(-80, 180), Vector2(-180, 180)
-		])
-	},
-	"industrial": {
-		"color": "#1f2937", "height_min": 9, "height_max": 24, "ground": "#161616",
-		"polygon": PackedVector2Array([
-			Vector2(-180, -120), Vector2(-80, -120), Vector2(-80, 40), Vector2(-180, 40)
-		])
-	},
-	"suburbs": {
-		"color": "#525252", "height_min": 4, "height_max": 9, "ground": "#1a2a1a",
-		"polygon": PackedVector2Array([
-			# West suburbs
-			Vector2(-180, -120), Vector2(-80, -120), Vector2(-80, 40), Vector2(-180, 40),
-			# East suburbs (between downtown and harbor)
-			Vector2(80, -80), Vector2(120, -80), Vector2(120, 80), Vector2(80, 80)
-		])
-	},
-	"rural": {
-		"color": "#6b5b4a", "height_min": 3, "height_max": 6, "ground": "#2a3a1a",
-		# Rural is everything outside the city (handled by distance check in get_district_at)
-		"polygon": PackedVector2Array([])
-	},
-}
+# District definitions (built at runtime via _init_districts() because
+# PackedVector2Array constructor can't be used in const expression)
+static var DISTRICTS: Dictionary = {}
+
+static func _init_districts() -> void:
+	if not DISTRICTS.is_empty():
+		return  # already initialized
+	DISTRICTS = {
+		"downtown": {
+			"color": "#475569", "height_min": 24, "height_max": 80, "ground": "#1a1a1a",
+			"polygon": PackedVector2Array([
+				Vector2(-80, -80), Vector2(80, -80), Vector2(80, 80), Vector2(-80, 80)
+			])
+		},
+		"harbor": {
+			"color": "#1c1917", "height_min": 8, "height_max": 22, "ground": "#171717",
+			"polygon": PackedVector2Array([
+				Vector2(80, -100), Vector2(260, -100), Vector2(260, 180),
+				Vector2(180, 180), Vector2(180, -60), Vector2(80, -60), Vector2(80, 80), Vector2(120, 80)
+			])
+		},
+		"slums": {
+			"color": "#451a03", "height_min": 5, "height_max": 14, "ground": "#1a0f0a",
+			"polygon": PackedVector2Array([
+				Vector2(-180, 40), Vector2(-80, 40), Vector2(-80, 180), Vector2(-180, 180)
+			])
+		},
+		"industrial": {
+			"color": "#1f2937", "height_min": 9, "height_max": 24, "ground": "#161616",
+			"polygon": PackedVector2Array([
+				Vector2(-180, -120), Vector2(-80, -120), Vector2(-80, 40), Vector2(-180, 40)
+			])
+		},
+		"suburbs": {
+			"color": "#525252", "height_min": 4, "height_max": 9, "ground": "#1a2a1a",
+			"polygon": PackedVector2Array([
+				Vector2(-180, -120), Vector2(-80, -120), Vector2(-80, 40), Vector2(-180, 40),
+				Vector2(80, -80), Vector2(120, -80), Vector2(120, 80), Vector2(80, 80)
+			])
+		},
+		"rural": {
+			"color": "#6b5b4a", "height_min": 3, "height_max": 6, "ground": "#2a3a1a",
+			"polygon": PackedVector2Array([])
+		},
+	}
 
 const CITY_RADIUS = 80.0  # legacy — used by terrain_height
 const WORLD_RADIUS = 250.0
@@ -115,6 +119,7 @@ const SCHEME_BUILDINGS: Array = [
 # ============================================================
 
 static func get_district_at(x: float, z: float) -> String:
+	_init_districts()  # ensure DISTRICTS is populated
 	var point = Vector2(x, z)
 	# Check each district polygon (order matters — check specific districts first)
 	for district_name in ["downtown", "harbor", "slums", "industrial"]:
@@ -191,6 +196,7 @@ static func _fractal_noise(x: float, z: float, octaves: int) -> float:
 	return value / max_val
 # ============================================================
 static func build_world(parent: Node3D) -> void:
+	_init_districts()  # ensure DISTRICTS is populated before any building
 	_build_terrain(parent)
 	_build_water(parent)
 	_build_roads(parent)
