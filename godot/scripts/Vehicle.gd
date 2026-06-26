@@ -1,7 +1,9 @@
 # Vehicle.gd — A drivable car with semi-realistic physics
+# Uses Quaternius Cars CC0 FBX models, falls back to box mesh if asset missing.
 extends CharacterBody3D
 
 var car_color: String = "#dc2626"
+var car_model: String = ""  # e.g. "NormalCar1" — see VehicleData.CAR_MODELS
 var yaw: float = 0.0
 var speed: float = 0.0  # forward speed (signed: +forward / -reverse)
 var max_speed: float = 22.0
@@ -9,11 +11,16 @@ var max_reverse: float = 8.0
 var accel: float = 10.0       # engine force when accelerating
 var brake_force: float = 18.0  # deceleration when braking
 var engine_brake: float = 4.0  # natural deceleration when no throttle
-var turn_rate: float = 1.4     # max yaw rate at full steering
+var turn_rate: float = 3.0     # max yaw rate at full steering
 var min_turn_speed: float = 1.0  # below this speed, no turning (no tank spins)
 var is_driven: bool = false
 
 @onready var mesh: Node3D = $CarMesh
+
+# Wheel nodes (found after model load) for wheel-spin animation
+var _wheel_nodes: Array = []
+# Last steering input for body-roll animation
+var _last_steer: float = 0.0
 
 func _ready():
 	add_to_group("vehicle")
@@ -24,11 +31,78 @@ func _ready():
 	rotation.y = yaw + PI
 
 func _build_mesh():
+	# Try loading the real FBX model first
+	if car_model != "":
+		var model_path = VehicleData.get_model_path(car_model)
+		if model_path != "" and ResourceLoader.has_method("exists") and ResourceLoader.exists(model_path):
+			_load_real_model(model_path)
+			return
+		elif model_path != "":
+			# ResourceLoader.exists may not work for unimported FBX;
+			# try load anyway — Godot will import on first editor open
+			var loaded = load(model_path)
+			if loaded != null:
+				_instantiate_model(loaded)
+				return
+			push_warning("Vehicle: could not load model '%s', falling back to box mesh" % car_model)
+	# Fallback: build simple box mesh
+	_build_box_mesh()
+
+func _load_real_model(model_path: String):
+	var packed_scene = load(model_path)
+	if packed_scene == null:
+		_build_box_mesh()
+		return
+	_instantiate_model(packed_scene)
+
+func _instantiate_model(packed_scene):
+	var instance = packed_scene.instantiate()
+	# Quaternius cars are roughly 4m long, 2m wide — scale to match our collision box (2 x 1.5 x 4.4)
+	# Tune this if models look wrong-sized in game
+	instance.scale = Vector3(1.0, 1.0, 1.0)
+	mesh.add_child(instance)
+	# Try to find wheel nodes for spin animation
+	_find_wheels(instance)
+	# Add headlights and taillights (lights are not in the model, add as before)
+	_add_lights()
+
+func _find_wheels(root):
+	# Quaternius cars typically name wheel nodes "Wheel_FL", "Wheel_FR", "Wheel_RL", "Wheel_RR"
+	# or similar. Walk the tree and collect any node whose name contains "wheel".
+	_wheel_nodes.clear()
+	_collect_wheels(root)
+
+func _collect_wheels(node):
+	if "wheel" in node.name.to_lower():
+		_wheel_nodes.append(node)
+	for child in node.get_children():
+		_collect_wheels(child)
+
+func _add_lights():
+	# Headlights
+	for x in [-0.6, 0.6]:
+		var hl = OmniLight3D.new()
+		hl.position = Vector3(x, 0.5, 2.2)
+		hl.light_color = Color(1, 0.95, 0.8)
+		hl.light_energy = 1.5
+		hl.omni_range = 8.0
+		mesh.add_child(hl)
+	# Taillights
+	for x in [-0.6, 0.6]:
+		var tl = OmniLight3D.new()
+		tl.position = Vector3(x, 0.5, -2.2)
+		tl.light_color = Color(1, 0.2, 0.1)
+		tl.light_energy = 0.8
+		tl.omni_range = 4.0
+		mesh.add_child(tl)
+
+# === Box mesh fallback (used if FBX model can't be loaded) ===
+func _build_box_mesh():
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = Color.from_string(car_color, Color.GRAY)
 	mat.roughness = 0.4
 	mat.metalness = 0.5
-	
+
 	# Body
 	var body = MeshInstance3D.new()
 	var body_m = BoxMesh.new()
@@ -37,7 +111,7 @@ func _build_mesh():
 	body.position = Vector3(0, 0.35, 0)
 	body.material_override = mat
 	mesh.add_child(body)
-	
+
 	# Cabin
 	var cabin = MeshInstance3D.new()
 	var cabin_m = BoxMesh.new()
@@ -46,7 +120,7 @@ func _build_mesh():
 	cabin.position = Vector3(0, 1.0, -0.2)
 	cabin.material_override = mat
 	mesh.add_child(cabin)
-	
+
 	# Windshield
 	var wind = MeshInstance3D.new()
 	var wind_m = BoxMesh.new()
@@ -60,8 +134,9 @@ func _build_mesh():
 	glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	wind.material_override = glass_mat
 	mesh.add_child(wind)
-	
-	# Wheels
+
+	# Wheels (also tracked for wheel-spin)
+	_wheel_nodes.clear()
 	for pos in [Vector3(-0.9, 0.35, 1.5), Vector3(0.9, 0.35, 1.5), Vector3(-0.9, 0.35, -1.5), Vector3(0.9, 0.35, -1.5)]:
 		var wheel = MeshInstance3D.new()
 		var w_m = CylinderMesh.new()
@@ -76,36 +151,22 @@ func _build_mesh():
 		wmat.roughness = 0.9
 		wheel.material_override = wmat
 		mesh.add_child(wheel)
-	
-	# Headlights
-	for x in [-0.6, 0.6]:
-		var hl = OmniLight3D.new()
-		hl.position = Vector3(x, 0.5, 2.2)
-		hl.light_color = Color(1, 0.95, 0.8)
-		hl.light_energy = 1.5
-		hl.omni_range = 8.0
-		mesh.add_child(hl)
-	
-	# Taillights
-	for x in [-0.6, 0.6]:
-		var tl = OmniLight3D.new()
-		tl.position = Vector3(x, 0.5, -2.2)
-		tl.light_color = Color(1, 0.2, 0.1)
-		tl.light_energy = 0.8
-		tl.omni_range = 4.0
-		mesh.add_child(tl)
+		_wheel_nodes.append(wheel)
+
+	_add_lights()
 
 func _physics_process(delta):
 	if not is_driven:
 		# Apply engine brake when nobody is driving
 		speed = move_toward(speed, 0, engine_brake * delta)
 		_apply_gravity_and_move(delta)
+		_animate_wheels_and_body(delta, 0.0)
 		return
-	
+
 	var throttle = 0.0
 	var steer = 0.0
 	var brake_input = false
-	
+
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
 		throttle += 1.0
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -116,90 +177,103 @@ func _physics_process(delta):
 		steer += 1.0
 	if Input.is_key_pressed(KEY_SPACE):
 		brake_input = true
-	
+
 	# === Engine model ===
-	# Forward acceleration
 	if throttle > 0:
 		speed += accel * throttle * delta
 		speed = min(speed, max_speed)
-	# Reverse (slower accel)
 	elif throttle < 0:
-		# If moving forward, throttle<0 acts as brake first
 		if speed > 0.5:
 			speed = max(0, speed - brake_force * delta)
 		else:
 			speed += -accel * 0.6 * delta
 			speed = max(speed, -max_reverse)
-	# Engine braking when no throttle
 	else:
 		if speed > 0:
 			speed = max(0, speed - engine_brake * delta)
 		elif speed < 0:
 			speed = min(0, speed + engine_brake * delta)
-	
-	# Explicit brake
+
 	if brake_input:
 		var decel = brake_force * delta
 		if speed > 0:
 			speed = max(0, speed - decel)
 		elif speed < 0:
 			speed = min(0, speed + decel)
-	
+
 	# === Steering model ===
-	# Cars cannot turn in place — require minimum forward motion.
-	# Steering authority scales with speed (more speed = less turn to avoid spin).
 	var abs_speed = abs(speed)
 	if abs_speed > min_turn_speed:
-		# Speed-dependent steering:
-		# - At low speed (just above min): full turn_rate (tight maneuvering)
-		# - At high speed: reduced turn (prevent unrealistic tank-like spinning)
-		# Tighter at all speeds, but decays faster at high speed
-		# At 1 m/s: factor=2.0 -> 1.5, turn=4.5 rad/s (very tight)
-		# At 5 m/s: factor=0.5, turn=1.5 rad/s (still tight)
-		# At 10 m/s: factor=0.27 -> 0.4, turn=1.2 rad/s (gentle highway)
-		# At 22 m/s (max): factor=0.13 -> 0.4, turn=1.2 rad/s (stable)
 		var speed_factor = clamp(2.0 / (abs_speed + 0.5), 0.4, 1.5)
 		var turn = steer * turn_rate * speed_factor * delta
-		# Steering direction: D=right should turn car right.
-		# Forward: yaw-- turns front toward +X (right). Reverse: inverted.
 		if speed < 0:  # reverse: steering inverts (like real car)
 			yaw += turn
 		else:
 			yaw -= turn
 	rotation.y = yaw + PI
-	
+
 	# === Velocity from yaw + speed ===
 	velocity.x = -sin(yaw) * speed
 	velocity.z = -cos(yaw) * speed
-	
+
 	_apply_gravity_and_move(delta)
-	
+
 	# === Collision response: lose speed on impact ===
-	# After move_and_slide(), check if we hit something and bleed off speed.
-	# This prevents the "spin in place against wall with full speed" bug.
 	if get_slide_collision_count() > 0:
-		# Determine collision component along velocity direction
 		var hit_normal = Vector3.ZERO
 		for i in get_slide_collision_count():
 			var c = get_slide_collision(i)
 			hit_normal += c.get_normal()
 		if hit_normal.length() > 0:
 			hit_normal = hit_normal.normalized()
-			# Project velocity onto hit normal (how much we hit into the wall)
 			var v_along_normal = velocity.dot(-hit_normal)
 			if v_along_normal > 0.5:
-				# Collision cost: lose most of the speed into the wall
-				# Plus a hard impact reduces overall speed
 				var impact_strength = clamp(v_along_normal / 8.0, 0.3, 0.95)
 				speed *= (1.0 - impact_strength)
-				# Apply some physical pushback (small bounce away from wall)
 				velocity += hit_normal * 1.5
-	
+
+	# Wheel spin + body roll animation
+	_animate_wheels_and_body(delta, steer)
+
 	# Sync player to vehicle position
 	var player = get_tree().get_first_node_in_group("player")
 	if player:
 		player.global_position = global_position
 		player.yaw = yaw
+
+	_last_steer = steer
+
+func _animate_wheels_and_body(delta: float, current_steer: float):
+	# Wheel spin: rotate around local X axis based on speed
+	# (wheels are typically rotated so their spin axis is X in local space)
+	var spin_rate = speed * 3.0  # rad/s, tuned for visual feel
+	for wheel in _wheel_nodes:
+		# Wheel local rotation: rotate around X
+		# Use rotate_x for accumulated rotation (don't set rotation.x directly
+		# because the wheel may have a base rotation for orientation)
+		wheel.rotate_x(spin_rate * delta)
+
+	# Body roll: lean into turns based on steer input and speed
+	# More speed + more steer = more roll. Cap at small angle for subtlety.
+	var target_roll = 0.0
+	var abs_speed = abs(speed)
+	if abs_speed > 1.0:
+		var speed_factor = clamp(abs_speed / max_speed, 0.0, 1.0)
+		# Lean OUTSIDE of the turn (positive steer = right turn = body rolls left = negative Z rotation)
+		target_roll = -current_steer * speed_factor * 0.08  # max ~4.5 degrees
+	# Smoothly interpolate to target roll
+	mesh.rotation.z = lerp(mesh.rotation.z, target_roll, delta * 5.0)
+	# Subtle pitch on accel/brake (squat and dive)
+	var target_pitch = 0.0
+	if is_driven:
+		var accel_input = 0.0
+		if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+			accel_input += 1.0
+		if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+			accel_input -= 1.0
+		# Accelerating = nose up (positive pitch), braking/reverse = nose down
+		target_pitch = -accel_input * 0.03  # max ~1.7 degrees
+	mesh.rotation.x = lerp(mesh.rotation.x, target_pitch, delta * 4.0)
 
 func _apply_gravity_and_move(delta):
 	# Apply gravity so the car stays on the ground
