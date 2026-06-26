@@ -168,17 +168,17 @@ func _physics_process(delta):
 
 # Streets are at positions [-300, -200, -100, 0, 100, 200, 300] in both axes
 # with ROAD_HALF_WIDTH (4m) buffer. NPCs should stay on sidewalks (outside this buffer).
-static var STREET_POSITIONS: Array = [-300, -200, -100, 0, 100, 200, 300]
+static var STREET_POSITIONS: Array = [200, 300, 400, 500, 600, 700]
 static var ROAD_HALF: float = 5.5  # 4m half-width + 1.5m buffer (keep NPCs on sidewalk)
 
 static func _is_on_street(x: float, z: float) -> bool:
 	# Check if position is on a street (within road half-width of any street line)
 	for pos in STREET_POSITIONS:
 		# East-West street at z=pos
-		if abs(z - pos) < ROAD_HALF and abs(x) < 380:
+		if abs(z - pos) < ROAD_HALF and abs(x) > 50 and abs(x) < 850:
 			return true
 		# North-South street at x=pos
-		if abs(x - pos) < ROAD_HALF and abs(z) < 380:
+		if abs(x - pos) < ROAD_HALF and abs(z) > -600 and abs(z) < 600:
 			return true
 	return false
 

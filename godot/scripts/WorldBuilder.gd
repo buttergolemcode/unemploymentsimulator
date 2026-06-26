@@ -219,8 +219,8 @@ static func build_world(parent: Node3D) -> void:
 
 static func _build_terrain(parent: Node3D) -> void:
 	# Visual terrain mesh with height variation
-	var size = 1400  # larger terrain mesh for bigger map
-	var segs = 120
+	var size = 3200  # 3000m playable + 100m margin  # larger terrain mesh for bigger map
+	var segs = 150
 	var mesh = PlaneMesh.new()
 	mesh.size = Vector2(size, size)
 	mesh.subdivide_width = segs
@@ -280,7 +280,7 @@ static func _build_terrain(parent: Node3D) -> void:
 	city_body.name = "CityGround"
 	var city_col = CollisionShape3D.new()
 	var city_shape = BoxShape3D.new()
-	city_shape.size = Vector3(1200, 1.0, 1200)  # 1200x1200 flat ground (covers city + inner rural)
+	city_shape.size = Vector3(3000, 1.0, 3000)  # 3000x3000 flat ground (covers city + inner rural)
 	city_col.shape = city_shape
 	city_col.position = Vector3(0, -0.5, 0)
 	city_body.add_child(city_col)
@@ -291,9 +291,9 @@ static func _build_terrain(parent: Node3D) -> void:
 	# New approach: grid of 50x50m boxes covering the full rural ring (380-580m radius)
 	var rural_body = StaticBody3D.new()
 	rural_body.name = "RuralGround"
-	var rural_grid = 50  # 50m spacing
-	for gx in range(-600, 601, rural_grid):
-		for gz in range(-600, 601, rural_grid):
+	var rural_grid = 80  # 80m spacing
+	for gx in range(-1200, 1201, rural_grid):
+		for gz in range(-1200, 1201, rural_grid):
 			var r = sqrt(gx * gx + gz * gz)
 			# Only place boxes in rural ring (between city edge and water)
 			if r < 380 or r > 580:
@@ -313,9 +313,9 @@ static func _build_terrain(parent: Node3D) -> void:
 	north_body.name = "MountainNorth"
 	var north_col = CollisionShape3D.new()
 	var north_shape = BoxShape3D.new()
-	north_shape.size = Vector3(1800, 100, 200)
+	north_shape.size = Vector3(3600, CANYON_HEIGHT, 300)
 	north_col.shape = north_shape
-	north_col.position = Vector3(0, 50, -700)
+	north_col.position = Vector3(0, CANYON_HEIGHT / 2, -1350)
 	north_body.add_child(north_col)
 	parent.add_child(north_body)
 	# South wall (z > 600)
@@ -323,9 +323,9 @@ static func _build_terrain(parent: Node3D) -> void:
 	south_body.name = "MountainSouth"
 	var south_col = CollisionShape3D.new()
 	var south_shape = BoxShape3D.new()
-	south_shape.size = Vector3(1800, 100, 200)
+	south_shape.size = Vector3(3600, CANYON_HEIGHT, 300)
 	south_col.shape = south_shape
-	south_col.position = Vector3(0, 50, 700)
+	south_col.position = Vector3(0, CANYON_HEIGHT / 2, 1350)
 	south_body.add_child(south_col)
 	parent.add_child(south_body)
 	# West wall (x < -600)
@@ -333,9 +333,9 @@ static func _build_terrain(parent: Node3D) -> void:
 	west_body.name = "MountainWest"
 	var west_col = CollisionShape3D.new()
 	var west_shape = BoxShape3D.new()
-	west_shape.size = Vector3(200, 100, 1800)
+	west_shape.size = Vector3(300, CANYON_HEIGHT, 3600)
 	west_col.shape = west_shape
-	west_col.position = Vector3(-700, 50, 0)
+	west_col.position = Vector3(-1350, CANYON_HEIGHT / 2, 0)
 	west_body.add_child(west_col)
 	parent.add_child(west_body)
 	# East harbor wall (low barrier at harbor edge)
@@ -343,9 +343,9 @@ static func _build_terrain(parent: Node3D) -> void:
 	east_body.name = "HarborBarrier"
 	var east_col = CollisionShape3D.new()
 	var east_shape = BoxShape3D.new()
-	east_shape.size = Vector3(20, 4, 1800)
+	east_shape.size = Vector3(20, 4, 3600)
 	east_col.shape = east_shape
-	east_col.position = Vector3(610, 2, 0)
+	east_col.position = Vector3(1510, 2, 0)
 	east_body.add_child(east_col)
 	parent.add_child(east_body)
 	
@@ -367,7 +367,7 @@ static func _build_water(parent: Node3D) -> void:
 	plane.material = mat
 	var mi = MeshInstance3D.new()
 	mi.mesh = plane
-	mi.position = Vector3(1200, -3.0, 0)  # east side, larger offset for bigger map
+	mi.position = Vector3(3000, -3.0, 0)  # far east ocean, larger offset for bigger map
 	parent.add_child(mi)
 
 # ============================================================
@@ -387,7 +387,7 @@ static func _build_roads(parent: Node3D) -> void:
 	_build_crosswalks(parent)
 
 static func _make_street(parent: Node3D, axis: String, pos: float) -> void:
-	var length = 1100.0  # spans entire city (extended for larger map)
+	var length = 1200.0  # spans Downtown area (extended for larger map)
 	# === ASPHALT (street surface, full length — runs through intersections) ===
 	var asphalt = MeshInstance3D.new()
 	var a_mesh = BoxMesh.new()
@@ -622,7 +622,7 @@ static func _build_filler_buildings(parent: Node3D) -> void:
 	# Block centers (between streets, at -250, -50, 50, 250)
 	# (because streets are at -300, -200, -100, 0, 100, 200, 300,
 	#  block centers are at -250, -150, -50, 50, 150, 250)
-	var block_centers = [-250, -150, -50, 50, 150, 250]
+	var block_centers = [250, 350, 450, 550, 650, 750]  # Downtown
 	
 	for bx in block_centers:
 		for bz in block_centers:
@@ -814,9 +814,9 @@ static func _is_on_road(x: float, z: float) -> bool:
 	# with sidewalk buffer
 	var road_buffer = ROAD_HALF_WIDTH + SIDEWALK_WIDTH
 	for pos in STREET_GRID:
-		if abs(z - pos) < road_buffer and abs(x) < 400:
+		if abs(z - pos) < road_buffer and abs(x) > 50 and abs(x) < 850:
 			return true
-		if abs(x - pos) < road_buffer and abs(z) < 400:
+		if abs(x - pos) < road_buffer and abs(z) > -600 and abs(z) < 600:
 			return true
 	return false
 
@@ -859,10 +859,10 @@ static func _make_tree(parent: Node3D, x: float, z: float, s: float):
 
 static func _build_street_lamps(parent: Node3D) -> void:
 	var positions = [
-		Vector3(-6, 0, -4), Vector3(6, 0, -4), Vector3(-6, 0, 6), Vector3(6, 0, 6),
-		Vector3(-20, 0, -20), Vector3(20, 0, -20), Vector3(-20, 0, 20), Vector3(20, 0, 20),
-		Vector3(-30, 0, -40), Vector3(-45, 0, -15), Vector3(30, 0, -40), Vector3(45, 0, -15),
-		Vector3(-30, 0, 40), Vector3(-45, 0, 15), Vector3(30, 0, 40), Vector3(45, 0, 15),
+		Vector3(250, 0, -50), Vector3(350, 0, -50), Vector3(450, 0, -50), Vector3(550, 0, -50),
+		Vector3(250, 0, 50), Vector3(350, 0, 50), Vector3(450, 0, 50), Vector3(550, 0, 50),
+		Vector3(650, 0, -50), Vector3(750, 0, -50), Vector3(650, 0, 50), Vector3(750, 0, 50),
+		Vector3(300, 0, -200), Vector3(500, 0, -200), Vector3(300, 0, 200), Vector3(500, 0, 200),
 	]
 	for pos in positions:
 		var pole = MeshInstance3D.new()
@@ -894,7 +894,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 	var b_mesh = BoxMesh.new()
 	b_mesh.size = Vector3(200, 0.1, 300)  # 200x300m harbor basin
 	basin.mesh = b_mesh
-	basin.position = Vector3(500, -2.0, 0)  # above water plane (y=-3.0) to avoid z-fight
+	basin.position = Vector3(1350, -2.0, 0)  # harbor basin at new coast plane (y=-3.0) to avoid z-fight
 	var basin_mat = StandardMaterial3D.new()
 	basin_mat.albedo_color = Color(0.05, 0.15, 0.28)  # dark water
 	basin_mat.roughness = 0.1
@@ -910,7 +910,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		var p_mesh = BoxMesh.new()
 		p_mesh.size = Vector3(120, 1.0, 20)  # 120m long, 20m wide pier
 		pier.mesh = p_mesh
-		pier.position = Vector3(500, 0.5, pier_z)  # at water level
+		pier.position = Vector3(1350, 0.5, pier_z)
 		var pier_mat = StandardMaterial3D.new()
 		pier_mat.albedo_color = Color(0.5, 0.5, 0.5)  # concrete gray
 		pier_mat.roughness = 0.95
@@ -918,7 +918,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		parent.add_child(pier)
 		# Collision for pier (so cars can drive on it)
 		var pier_body = StaticBody3D.new()
-		pier_body.position = Vector3(500, 0.5, pier_z)
+		pier_body.position = Vector3(1350, 0.5, pier_z)
 		var pier_col = CollisionShape3D.new()
 		var pier_shape = BoxShape3D.new()
 		pier_shape.size = Vector3(120, 1.0, 20)
@@ -933,7 +933,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		var s_mesh = BoxMesh.new()
 		s_mesh.size = Vector3(80, 8, 15)  # 80m long, 8m tall, 15m wide ship
 		ship.mesh = s_mesh
-		ship.position = Vector3(540, 4, ship_z + 15)  # next to pier, half in water
+		ship.position = Vector3(1390, 4, ship_z + 15), half in water
 		var ship_mat = StandardMaterial3D.new()
 		var ship_colors = ["#1e3a5f", "#1e293b", "#0c4a6e", "#1e3a5f"]
 		ship_mat.albedo_color = Color.from_string(ship_colors[ship_idx % 4], Color(0.12, 0.23, 0.54))
@@ -946,7 +946,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		var br_mesh = BoxMesh.new()
 		br_mesh.size = Vector3(15, 6, 12)
 		bridge.mesh = br_mesh
-		bridge.position = Vector3(540, 12, ship_z + 15)  # on top of ship
+		bridge.position = Vector3(1390, 12, ship_z + 15)
 		var bridge_mat = StandardMaterial3D.new()
 		bridge_mat.albedo_color = Color.WHITE
 		bridge_mat.roughness = 0.3
@@ -958,7 +958,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		# Place containers ON the piers (at pier height y=1.5)
 		var pier_idx = i % 3
 		var pier_z = -100 + pier_idx * 100
-		var cx = 460 + (i / 3) % 5 * 12  # along pier length
+		var cx = 1310 + (i / 3) % 5 * 12  # along pier length
 		var cz = pier_z + ((i / 3) / 5) % 2 * 6 - 3  # across pier width
 		var container = MeshInstance3D.new()
 		var c_mesh = BoxMesh.new()
@@ -977,7 +977,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 	for i in range(6):
 		var crane_idx = i % 3
 		var crane_z = -100 + crane_idx * 100
-		var crane_x = 480 + (i / 3) * 30
+		var crane_x = 1330 + (i / 3) * 30
 		var crane = _make_crane()
 		crane.position = Vector3(crane_x, 1.0, crane_z)  # on pier
 		parent.add_child(crane)
@@ -1018,23 +1018,23 @@ static func _make_crane() -> Node3D:
 # ============================================================
 
 static func _build_landmarks(parent: Node3D) -> void:
-	# Central Park (large green area in downtown)
-	_park(parent, -50, 100, 80, 50)
-	# Skyline row (3 tall towers, 100-150m)
-	_skyscraper(parent, 150, -100, 18, 110, "#1e293b")
-	_skyscraper(parent, 175, -100, 18, 140, "#0f172a")
-	_skyscraper(parent, 200, -100, 18, 120, "#1e293b")
-	# Bridge at harbor
-	_bridge(parent, 250, 0, 0)
-	# Fortress on west hill
-	_fortress(parent, -300, -300)
-	# Stadium (large, ~80m diameter)
-	_stadium(parent, -250, 100)
-	# Bus station
-	_bus_station(parent, 100, 150)
-	# Gas stations
-	_gas_station(parent, -200, -200)
-	_gas_station(parent, 200, 200)
+	# Central Park (Downtown, between skyscrapers)
+	_park(parent, 400, 300, 100, 60)
+	# Skyline row (3 tall towers in Downtown East, near harbor)
+	_skyscraper(parent, 700, -100, 20, 110, "#1e293b")
+	_skyscraper(parent, 730, -100, 20, 140, "#0f172a")
+	_skyscraper(parent, 760, -100, 20, 120, "#1e293b")
+	# Bridge at harbor entrance
+	_bridge(parent, 1200, 0, 0)
+	# Fortress on west canyon rim
+	_fortress(parent, -1000, -800)
+	# Stadium in Industrial area
+	_stadium(parent, -300, 200)
+	# Bus station in Downtown
+	_bus_station(parent, 450, -250)
+	# Gas stations (Industrial + Harbor)
+	_gas_station(parent, -300, -200)
+	_gas_station(parent, 700, 300)
 
 static func _park(parent: Node3D, x: float, z: float, w: float, d: float) -> void:
 	# Park with clear boundary (sidewalk-style border) like a building block
