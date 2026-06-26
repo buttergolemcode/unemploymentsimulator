@@ -11,8 +11,8 @@ var max_reverse: float = 8.0
 var accel: float = 10.0       # engine force when accelerating
 var brake_force: float = 18.0  # deceleration when braking
 var engine_brake: float = 4.0  # natural deceleration when no throttle
-var turn_rate: float = 3.0     # max yaw rate at full steering
-var min_turn_speed: float = 1.0  # below this speed, no turning (no tank spins)
+var turn_rate: float = 2.0     # max yaw rate at full steering (rad/s)
+var min_turn_speed: float = 2.0  # below this speed, no turning (no tank spins)
 var is_driven: bool = false
 
 @onready var mesh: Node3D = $CarMesh
@@ -204,7 +204,19 @@ func _physics_process(delta):
 	# === Steering model ===
 	var abs_speed = abs(speed)
 	if abs_speed > min_turn_speed:
-		var speed_factor = clamp(2.0 / (abs_speed + 0.5), 0.4, 1.5)
+		# Bell-curve steering authority (realistic):
+		# - Ramps UP from 0 at standstill to peak at ~5 m/s (city cornering)
+		# - Decreases at high speed for stability (no tank-spin at top speed)
+		# At 2 m/s: factor=0.28, turn=0.56 rad/s (32 deg/s — slow parking)
+		# At 5 m/s: factor=0.70, turn=1.40 rad/s (80 deg/s — tight corner)
+		# At 10 m/s: factor=0.58, turn=1.16 rad/s (66 deg/s — avenue)
+		# At 22 m/s: factor=0.30, turn=0.60 rad/s (34 deg/s — highway)
+		var speed_factor: float
+		if abs_speed < 5.0:
+			speed_factor = (abs_speed / 5.0) * 0.70
+		else:
+			speed_factor = 0.70 - (abs_speed - 5.0) / 17.0 * 0.40
+			speed_factor = clamp(speed_factor, 0.30, 0.70)
 		var turn = steer * turn_rate * speed_factor * delta
 		if speed < 0:  # reverse: steering inverts (like real car)
 			yaw += turn

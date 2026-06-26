@@ -7,6 +7,7 @@ const MOUSE_SENS = 0.0022
 const PITCH_LIMIT = 1.5
 
 var yaw: float = 0.0
+var camera_yaw: float = 0.0  # independent camera orbit yaw (mouse-controlled, used in vehicle)
 var pitch: float = 0.0
 var camera_mode: String = "first"
 var in_vehicle: Node = null
@@ -28,7 +29,11 @@ func _unhandled_input(event):
 		return
 	
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		yaw -= event.relative.x * MOUSE_SENS
+		if in_vehicle:
+			# In vehicle: mouse controls camera_yaw (independent orbit), not car yaw
+			camera_yaw -= event.relative.x * MOUSE_SENS
+		else:
+			yaw -= event.relative.x * MOUSE_SENS
 		pitch -= event.relative.y * MOUSE_SENS
 		pitch = clamp(pitch, -PITCH_LIMIT, PITCH_LIMIT)
 	
@@ -113,7 +118,9 @@ func _update_vehicle_camera():
 		return
 	var dist = 7.0
 	var h = 2.5
-	camera.global_position = v.global_position + Vector3(sin(yaw) * dist, h, cos(yaw) * dist)
+	# Use camera_yaw (mouse-controlled) instead of yaw (synced to car)
+	# This lets the player look around the car independently of driving direction
+	camera.global_position = v.global_position + Vector3(sin(camera_yaw) * dist, h, cos(camera_yaw) * dist)
 	camera.look_at(v.global_position + Vector3(0, 1.2, 0))
 	camera.fov = 65
 
@@ -173,6 +180,7 @@ func _try_vehicle_enter_exit():
 				in_vehicle = vehicle
 				vehicle.enter()
 				yaw = vehicle.yaw
+				camera_yaw = vehicle.yaw  # init camera_yaw to car heading (no jump)
 				velocity = Vector3.ZERO  # reset velocity to prevent flying after exit
 				visible = false
 				GameManager.log_message.emit("Entered vehicle. WASD to drive, Space to brake, F to exit.", "info")
