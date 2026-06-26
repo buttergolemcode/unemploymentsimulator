@@ -222,6 +222,7 @@ func _physics_process(delta):
 			speed = min(0, speed + decel)
 
 	# === Steering model ===
+	var abs_speed = abs(speed)
 	if abs_speed > min_turn_speed:
 		# Bell-curve steering authority (realistic):
 		# - Ramps UP from 0 at standstill to peak at ~5 m/s (city cornering)
