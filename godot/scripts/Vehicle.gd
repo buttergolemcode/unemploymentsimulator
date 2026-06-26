@@ -276,6 +276,7 @@ func _physics_process(delta):
 	_last_steer = steer
 
 func _animate_wheels_and_body(delta: float, current_steer: float):
+	var abs_speed = abs(speed)  # used by both front-wheel + body-roll sections
 	# Wheel spin: rotate around local X axis based on speed
 	# (wheels are typically rotated so their spin axis is X in local space)
 	var spin_rate = speed * 3.0  # rad/s, tuned for visual feel
