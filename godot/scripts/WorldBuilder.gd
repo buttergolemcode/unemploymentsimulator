@@ -441,48 +441,22 @@ static func _make_sidewalk_segment(parent: Node3D, axis: String, pos: float,
 	smat.roughness = 0.9
 	sidewalk.material_override = smat
 	parent.add_child(sidewalk)
-	# COLLISION: StaticBody3D so cars/player can drive/walk on sidewalk
+	# COLLISION: StaticBody3D with LOW collision height (5cm)
+	# Visual sidewalk is 15cm tall, but collision is only 5cm — small enough
+	# for floor_snap (0.5m) to reliably pull cars/players up onto it.
+	# This avoids the need for ramps or slope collision shapes.
+	var collision_height = 0.05  # 5cm collision (visual stays 15cm)
 	var body = StaticBody3D.new()
-	body.position = Vector3(sx, SIDEWALK_HEIGHT / 2, sz)
+	body.position = Vector3(sx, collision_height / 2, sz)
 	var col = CollisionShape3D.new()
 	var shape = BoxShape3D.new()
 	if axis == "x":
-		shape.size = Vector3(seg_len, SIDEWALK_HEIGHT, SIDEWALK_WIDTH)
+		shape.size = Vector3(seg_len, collision_height, SIDEWALK_WIDTH)
 	else:
-		shape.size = Vector3(SIDEWALK_WIDTH, SIDEWALK_HEIGHT, seg_len)
+		shape.size = Vector3(SIDEWALK_WIDTH, collision_height, seg_len)
 	col.shape = shape
 	body.add_child(col)
 	parent.add_child(body)
-	
-	# RAMP COLLISION: Rotated box forming smooth slope from street to sidewalk
-	# More reliable than steps — CharacterBody3D can drive up slopes but not steps.
-	# Ramp: 60cm long, rotated ~14° so it goes from y=0 (street) to y=0.15 (sidewalk).
-	var ramp_length = 0.6   # 60cm ramp length
-	var ramp_thickness = 0.05
-	# Angle: arctan(SIDEWALK_HEIGHT / ramp_length) — slope angle
-	var ramp_angle = atan(SIDEWALK_HEIGHT / ramp_length)
-	# Hypotenuse length (actual box length needed)
-	var ramp_box_len = sqrt(ramp_length * ramp_length + SIDEWALK_HEIGHT * SIDEWALK_HEIGHT)
-	var ramp_body = StaticBody3D.new()
-	var ramp_col = CollisionShape3D.new()
-	var ramp_shape = BoxShape3D.new()
-	# Ramp center position: midpoint between street edge and sidewalk edge
-	# Street edge: sz + (-side * SIDEWALK_WIDTH / 2)
-	# Sidewalk edge: sz + (side * SIDEWALK_WIDTH / 2) — but ramp starts at street edge
-	# Ramp midpoint: at street edge + ramp_length/2 toward sidewalk, height SIDEWALK_HEIGHT/2
-	var ramp_mid_offset = -side * (SIDEWALK_WIDTH / 2) + side * (ramp_length / 2)
-	var ramp_height = SIDEWALK_HEIGHT / 2
-	if axis == "x":
-		ramp_shape.size = Vector3(seg_len, ramp_thickness, ramp_box_len)
-		ramp_body.position = Vector3(sx, ramp_height, sz + ramp_mid_offset)
-		ramp_body.rotation.x = -side * ramp_angle  # tilt to slope up toward sidewalk
-	else:
-		ramp_shape.size = Vector3(ramp_box_len, ramp_thickness, seg_len)
-		ramp_body.position = Vector3(sx + ramp_mid_offset, ramp_height, sz)
-		ramp_body.rotation.z = side * ramp_angle  # tilt to slope up toward sidewalk
-	ramp_col.shape = ramp_shape
-	ramp_body.add_child(ramp_col)
-	parent.add_child(ramp_body)
 
 static func _make_dash(parent: Node3D, axis: String, pos: float, t: float) -> void:
 	var dash = MeshInstance3D.new()
@@ -529,12 +503,13 @@ static func _make_sidewalk_corner(parent: Node3D, x: float, z: float) -> void:
 	smat.roughness = 0.9
 	corner.material_override = smat
 	parent.add_child(corner)
-	# COLLISION: StaticBody3D so cars/player can stand on corner
+	# COLLISION: StaticBody3D with LOW collision height (5cm, matches segments)
+	var collision_height = 0.05
 	var body = StaticBody3D.new()
-	body.position = Vector3(x, SIDEWALK_HEIGHT / 2, z)
+	body.position = Vector3(x, collision_height / 2, z)
 	var col = CollisionShape3D.new()
 	var shape = BoxShape3D.new()
-	shape.size = Vector3(SIDEWALK_WIDTH, SIDEWALK_HEIGHT, SIDEWALK_WIDTH)
+	shape.size = Vector3(SIDEWALK_WIDTH, collision_height, SIDEWALK_WIDTH)
 	col.shape = shape
 	body.add_child(col)
 	parent.add_child(body)
