@@ -168,8 +168,13 @@ using the GLB/FBX assets. D.3 (NPCs) blocked until Blender or alternative source
 - Vehicle.gd _instantiate_model(): scales model, calls _find_wheels()
 - Vehicle.gd _find_wheels(): walks tree, collects nodes with "wheel" in name
   (handles Quaternius naming convention "Wheel_FL" etc.)
+  - Separates front/rear wheels via "_f"/"front" and "_r"/"rear"/"_b" in name
+  - Fallback: first 2 wheels assumed front
 - Vehicle.gd _animate_wheels_and_body(): new function called every physics frame
   - Wheel spin: rotate_x(spin_rate * delta) where spin_rate = speed * 3
+  - **Front-wheel steering**: front wheels turn left/right based on steer input
+    - Max angle 0.5 rad (~28°) at low speed, reduced at high speed
+    - Smoothly lerped (delta * 8.0) for natural response
   - Body roll: lean into turns (target_roll = -steer * speed_factor * 0.08)
     Smoothly lerped, max ~4.5° angle for subtlety
   - Body pitch: squat on accel, dive on brake (target_pitch = -throttle * 0.03)
@@ -178,11 +183,17 @@ using the GLB/FBX assets. D.3 (NPCs) blocked until Blender or alternative source
 - Lights (headlights + taillights) added separately — not in Quaternius model
 - Body collision unchanged: BoxShape3D(2, 1.5, 4.4) at y=0.75
 
-**Status:** Code complete. User needs to open Godot editor once to trigger
-FBX import (auto-generates .import files). After that, vehicles will use
-real Quaternius car models.
+**Status:** ✅ Code complete + tested by user. Real Quaternius car models
+visible in-game. Front wheels visibly turn when steering.
 
-#### D.3 — NPC model integration (Quaternius Animated Characters)
+**Post-D.2 polish (additional fixes after initial D.2):**
+- Free-look camera in vehicle: added `camera_yaw` variable separate from `yaw`
+  so mouse can orbit camera around car without affecting driving direction
+- Realistic low-speed turning: replaced inverse formula with bell curve
+  (peak at 5 m/s, ramps up from standstill, decreases at high speed)
+  Old: 230°/s at 1 m/s (tank-spin) → New: 32°/s at 2 m/s (parking-lot realistic)
+
+#### D.3 — NPC model integration (Quaternius Animated Characters) ⬅️ UNBLOCKED
 - Import character pack FBX → multiple `.glb` scenes with AnimationPlayer (idle, walk, run)
 - Set up AnimationLibrary with shared animations across characters
 - Update `NPC.gd _build_mesh()` to randomly pick a character + walk animation
@@ -190,6 +201,11 @@ real Quaternius car models.
 - Add idle animation when NPC reaches target (instead of stopping dead)
 - Add 'scream' animation trigger on vehicle knockdown
 - Update player `_build_mesh()` to use a proper character model too (third-person view)
+
+**Status:** User installed Blender via Steam (E:\SteamLibrary\steamapps\common\Blender\blender.exe).
+Path needs to be configured in Godot Editor Settings → FileSystem → Import → Blender → Blender Path.
+Once set, Godot will auto-import the .blend files in `godot/assets/quaternius_chars/`
+and `godot/assets/quaternius_streets/`.
 
 #### D.4 — Building system overhaul (Kenney City Kit)
 - Build a **MeshLibrary** in Godot editor from Kenney modular building parts
