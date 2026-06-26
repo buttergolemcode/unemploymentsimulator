@@ -854,7 +854,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		ship.position = Vector3(540, 4, ship_z + 15)  # next to pier, half in water
 		var ship_mat = StandardMaterial3D.new()
 		var ship_colors = ["#1e3a5f", "#1e293b", "#0c4a6e", "#1e3a5f"]
-		ship_mat.albedo_color = Color.from_string(ship_colors[ship_idx % 4], Color.NAVY)
+		ship_mat.albedo_color = Color.from_string(ship_colors[ship_idx % 4], Color(0.12, 0.23, 0.54))
 		ship_mat.roughness = 0.4
 		ship_mat.metalness = 0.5
 		ship.material_override = ship_mat
