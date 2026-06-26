@@ -43,10 +43,10 @@ func _build_mesh():
 		var instance = packed_scene.instantiate()
 		# Quaternius characters are roughly 1.8m tall, scale to match our collision
 		instance.scale = Vector3(1.0, 1.0, 1.0)
-		# Rotate to face forward (FBX may have different default orientation)
-		# Quaternius characters face -Z by default (Godot's forward direction).
-		# Our NPC movement uses facing = atan2(dx, dz), where facing=0 means
-		# moving toward -Z. So no rotation needed — model already faces -Z.
+		# Pragmatic fix: rotate mesh by PI to face movement direction.
+		# Despite Godot's -Z forward convention, the facing = atan2(-dx, -dz)
+		# formula produces opposite orientation for this FBX. PI fixes it.
+		instance.rotation.y = PI
 		mesh.add_child(instance)
 		# Add merchant badge if applicable
 		if is_merchant:
