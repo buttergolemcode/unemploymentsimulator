@@ -658,6 +658,39 @@ static func _make_crane() -> Node3D:
 	return root
 
 # ============================================================
+# Trees (used by park + scattered in rural areas)
+# ============================================================
+
+static func _make_tree(parent: Node3D, x: float, z: float, s: float):
+	var ground_y = terrain_height(x, z)
+	# Trunk
+	var trunk = MeshInstance3D.new()
+	var trunk_mesh = CylinderMesh.new()
+	trunk_mesh.top_radius = 0.2
+	trunk_mesh.bottom_radius = 0.3
+	trunk_mesh.height = 3
+	trunk.mesh = trunk_mesh
+	trunk.position = Vector3(x, ground_y + 1.5, z)
+	var tmat = StandardMaterial3D.new()
+	tmat.albedo_color = Color(0.29, 0.23, 0.1)
+	tmat.roughness = 0.9
+	trunk.material_override = tmat
+	trunk.scale = Vector3(s, s, s)
+	parent.add_child(trunk)
+	# Foliage (cone)
+	var foliage = MeshInstance3D.new()
+	var fol_mesh = PrismMesh.new()
+	fol_mesh.size = Vector3(3.6, 4, 3.6)
+	foliage.mesh = fol_mesh
+	foliage.position = Vector3(x, ground_y + 3.5, z)
+	var fmat = StandardMaterial3D.new()
+	fmat.albedo_color = Color(0.17, 0.29, 0.1)
+	fmat.roughness = 0.85
+	foliage.material_override = fmat
+	foliage.scale = Vector3(s, s, s)
+	parent.add_child(foliage)
+
+# ============================================================
 # Street lamps
 # ============================================================
 
