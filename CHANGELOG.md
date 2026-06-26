@@ -8,15 +8,62 @@ Format: entries are grouped by Sprint sub-step, newest first. Each entry has the
 
 ## Sprint D — Assets & Map Polish
 
-### D.3 — NPC model integration ✅
+### D.2 — Vehicle model integration ✅ (post-completion fixes)
 
-**Commit `4595322` (2026-06-26): Quaternius Modular Characters integration**
+**Commit `f7ca151` (2026-06-26): Front wheel steering direction inverted**
+- A=left turned wheels RIGHT visually (wrong direction)
+- Root cause: `pivot.rotation.y = +X` rotates counterclockwise from above.
+  Positive steer (D=right) was mapped to positive Y rotation → wheels turned LEFT.
+- Fix: Negate the steering input in `target_steer_angle = -current_steer * 0.5 * steer_visual_factor`
+- Now: A → wheels turn left, D → wheels turn right
+
+**Commit `edee88f` (2026-06-26): Pivot-based wheel steering (proper fix)**
+- Front wheels appeared as black circles (Felge hidden) when steering
+- Root cause: `wheel.rotation.y = X` rotated the wheel MESH around Y, which
+  changed the cylinder's axis orientation. User saw tire's side profile
+  instead of the rim.
+- Fix: Wrap each front wheel in a parent `pivot` Node3D. Rotate PIVOT on Y,
+  not the wheel mesh itself. Preserves wheel's local orientation.
+- New vars: `_front_wheel_pivots`, `_front_wheels_raw`
+- `_find_wheels()` now creates pivot Node3Ds and reparents wheels into them
+- `_collect_wheels()` detects Quaternius naming ("FrontLeftWheel", "FrontRightWheel", "BackWheels")
+- Box-mesh fallback also uses pivots (consistent behavior)
+
+**Commit `e4d07ec` (2026-06-26): Indentation fix**
+- Converted PlayerController.gd, GameScene.gd, WorldBuilder.gd from spaces to tabs
+- Godot 4.7 linter was warning "Used space character for indentation instead of tab"
+- All 16 .gd files now use tabs consistently
+
+**Commit `ecacf0b` (2026-06-26): NPC orientation fix + re-enable wheel steering**
+- Re-enabled `instance.rotation.y = PI` in NPC.gd and PlayerController.gd
+  (had been removed in previous attempt to fix backwards walking)
+- Re-enabled front-wheel steering animation (was disabled to fix glitching)
+
+**Commit `dac7ed8` (2026-06-26): Wheel glitching + NPC T-pose diagnosis**
+- Diagnosed: Quaternius Modular Characters pack has no animations (T-pose expected)
+- Diagnosed: NPCs walking backwards due to wrong mesh orientation
+- Reduced walk bob amplitude (0.06 → 0.03) for subtler animation
+
+**Commits `698b197` + `e443928` (2026-06-26): abs_speed scope fixes**
+- Fixed two instances of `Identifier 'abs_speed' not declared in current scope`
+- Bug introduced during front-wheel steering refactor
+- Added `var abs_speed = abs(speed)` declarations in both `_physics_process` and `_animate_wheels_and_body`
+
+### D.3 — NPC model integration ✅ (post-completion fixes)
+
+**Commit `a2dc007` (2026-06-26): NPC/player walking backwards (final fix)**
+- Math-based fix (`atan2(-dx, -dz)`) didn't work for Quaternius FBX models
+- Pragmatic fix per user suggestion: rotate mesh by PI (180 degrees)
+- `instance.rotation.y = PI` in both NPC.gd and PlayerController.gd
+- T-pose remains (no animations in Modular Characters pack — expected)
+- Real walk animations would need Universal Animation Library (not auto-downloadable from itch.io)
+
+**Commit `4595322` (2026-06-26): Initial D.3 implementation**
 - Downloaded Quaternius Ultimate Modular Characters Pack via gdown from Google Drive
 - 12 FBX files added to `godot/assets/quaternius_modular_chars/FBX/`:
   Adventurer, Beach, Casual, Casual2, Farmer, King, Punk, Spacesuit, Suit, Swat, Worker + Humans_Master
 - `NPC.gd`: Added `CHARACTER_MODELS` const (11 names), `get_model_path()` static helper
 - `NPC.gd _build_mesh()`: Loads random character FBX, falls back to capsule
-- `NPC.gd`: Added walk forward lean (`mesh.rotation.x = lerp(..., 0.08, delta * 5.0)`)
 - `PlayerController.gd _build_mesh()`: Loads `Suit.fbx` as player model
 - `PlayerController.gd`: Extracted `_build_capsule_mesh(mesh_node)` as fallback helper
 - Merchant badge added separately on top of real character model
@@ -30,7 +77,7 @@ walk bob + forward lean for now. Real animations will be integrated when availab
 - Removed accidentally committed HTML files (char_page.html, page.html, search.html)
 - Updated `.gitignore` to exclude *.html (except index.html)
 
-### D.2 — Vehicle model integration ✅
+### D.2 — Vehicle model integration ✅ (initial)
 
 **Commit `b564d53` (2026-06-26): Front-wheel steering animation**
 - `Vehicle.gd _animate_wheels_and_body()`: front wheels now turn on Y-axis based on steer input
