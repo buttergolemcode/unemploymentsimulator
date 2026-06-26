@@ -263,6 +263,22 @@ static func _build_terrain(parent: Node3D) -> void:
 	city_body.add_child(city_col)
 	parent.add_child(city_body)
 	
+	# 1b) Rural ground (slightly raised to match terrain_height in rural area)
+	# Terrain rises in rural zone (outside city radius), so we add raised collision
+	# boxes in 4 corners to support the car on the visible hills
+	var rural_body = StaticBody3D.new()
+	rural_body.name = "RuralGround"
+	for corner in [[-300, -300], [300, -300], [-300, 300], [300, 300]]:
+		var rcol = CollisionShape3D.new()
+		var rshape = BoxShape3D.new()
+		rshape.size = Vector3(200, 1.0, 200)
+		rcol.shape = rshape
+		# Match terrain height at corner (rural zone has ~5-10m elevation)
+		var h_at_corner = terrain_height(corner[0], corner[1])
+		rcol.position = Vector3(corner[0], h_at_corner - 0.5, corner[1])
+		rural_body.add_child(rcol)
+	parent.add_child(rural_body)
+	
 	# 2) Mountain walls (N and S) - tall boxes that block vehicle passage
 	# North mountain wall (z < -400)
 	var north_body = StaticBody3D.new()
@@ -335,21 +351,13 @@ const ROAD_HALF_SIDE = 5.5    # 2-lane side street (11m wide)
 const SIDEWALK = 3.0
 
 static func _build_roads(parent: Node3D) -> void:
-	# Main avenues (4-lane) cross at the city center
-	# East-West main roads at z = -100, z = +100
-	# North-South main roads at x = -100, x = +100
-	for pos in [-100, 100]:
+	# Clean road system: 3 main avenues per axis (at -200, 0, +200)
+	# These define clear city blocks of 200x200m each
+	# No more 50m street grid that made everything look like a checkerboard
+	var avenue_positions = [-200, 0, 200]
+	for pos in avenue_positions:
 		_make_road(parent, "x", pos, ROAD_HALF_MAIN, SIDEWALK, true)
 		_make_road(parent, "z", pos, ROAD_HALF_MAIN, SIDEWALK, true)
-	
-	# Secondary streets (2-lane) every 50m in the city grid
-	for p in range(-300, 301, 50):
-		if abs(p) == 100:
-			continue  # already done as main avenue
-		if abs(p) > 350:
-			continue  # outside city
-		_make_road(parent, "x", p, ROAD_HALF_SIDE, SIDEWALK, false)
-		_make_road(parent, "z", p, ROAD_HALF_SIDE, SIDEWALK, false)
 
 static func _make_road(parent: Node3D, axis: String, pos: float, half_w: float, sw: float, _is_main: bool):
 	var length = 720.0  # slightly less than map size to fit island
@@ -456,136 +464,191 @@ static func _build_scheme_buildings(parent: Node3D) -> void:
 # ============================================================
 
 static func _build_filler_buildings(parent: Node3D) -> void:
-	# Place buildings on a grid, skipping roads and scheme-building areas
-	# Dense layout: 15m grid (was 25m), smaller gaps, bigger buildings
-	var grid = 15  # 15m grid spacing (denser than 25m)
-	var half = 380  # cover city area
-	for gx in range(-half, half + 1, grid):
-		for gz in range(-half, half + 1, grid):
-			var cx = gx + grid / 2.0
-			var cz = gz + grid / 2.0
-			var r = sqrt(cx * cx + cz * cz)
-			if r > 390:
-				continue  # outside city
-			if _is_on_road(cx, cz):
-				continue
-			# Skip near scheme buildings
-			var too_close = false
-			for b in SCHEME_BUILDINGS:
-				if sqrt((cx - b.x) ** 2 + (cz - b.z) ** 2) < max(b.w, b.d) / 2 + 4:
-					too_close = true
-					break
-			if too_close:
-				continue
+	# BLOCK-BASED placement: city is divided into 200x200m blocks by the
+	# main avenues (at -200, 0, +200). Each block gets 2-4 buildings placed
+	# at clear positions within the block, NOT random grid.
+	# This gives a clean city look with clear separation streets/buildings.
+	
+	var block_size = 200.0  # distance between avenues
+	var road_buffer = ROAD_HALF_MAIN + SIDEWALK  # space to leave near roads
+	var block_padding = road_buffer + 4.0  # extra margin from road
+	
+	# Iterate over all 200x200m blocks in the city area
+	var block_coords = [-300, -100, 100]  # block centers (between avenues)
+	for bx in block_coords:
+		for bz in block_coords:
+			# Block corners
+			var bx_min = bx - block_size / 2 + block_padding
+			var bx_max = bx + block_size / 2 - block_padding
+			var bz_min = bz - block_size / 2 + block_padding
+			var bz_max = bz + block_size / 2 - block_padding
 			
-			var dist_id = get_district_at(cx, cz)
+			var block_w = bx_max - bx_min
+			var block_d = bz_max - bz_min
+			if block_w < 10 or block_d < 10:
+				continue  # block too small
+			
+			# District at block center
+			var dist_id = get_district_at(bx, bz)
 			if dist_id == "water" or dist_id == "rural":
 				continue  # no filler buildings in water/rural
 			
-			# Hash-based random for deterministic placement
-			var seed_val = abs((gx * 73856093) ^ (gz * 19349663)) % 99991
-			var rng = func(salt): return float((seed_val * (salt + 1) * 9301 + 49297) % 233280) / 233280
+			# Place 2x2 = 4 buildings per block, with clear spacing
+			var buildings_per_side = 2
+			var cell_w = block_w / buildings_per_side
+			var cell_d = block_d / buildings_per_side
 			
-			# Gap chance — REDUCED for higher density
-			var gap = 0.10
-			match dist_id:
-				"downtown": gap = 0.05  # very dense (was 0.10)
-				"harbor": gap = 0.25    # (was 0.40)
-				"slums": gap = 0.10     # (was 0.20)
-				"industrial": gap = 0.20  # (was 0.30)
-				"suburbs": gap = 0.35   # (was 0.50)
-			if rng.call(99) < gap:
-				continue
-			
-			# Building dimensions per district — BIGGER for better fill
-			var w: float
-			var d: float
-			var h: float
-			var dist = DISTRICTS[dist_id]
-			if dist_id == "downtown":
-				w = 10 + rng.call(1) * 4  # 10-14m (was 12-20)
-				d = 9 + rng.call(2) * 4
-				h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
-			elif dist_id == "industrial":
-				w = 11 + rng.call(1) * 4
-				d = 10 + rng.call(2) * 4
-				h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
-			elif dist_id == "harbor":
-				w = 12 + rng.call(1) * 4
-				d = 11 + rng.call(2) * 4
-				h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
-			elif dist_id == "slums":
-				w = 7 + rng.call(1) * 4
-				d = 6 + rng.call(2) * 4
-				h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
-			else:  # suburbs
-				w = 7 + rng.call(1) * 3
-				d = 6 + rng.call(2) * 3
-				h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
-			
-			# Offset within grid cell (small, to fill the cell tightly)
-			var margin = 1.0
-			var max_off = max(0, (grid - w - margin * 2) / 2)
-			var ox = (rng.call(4) - 0.5) * max_off
-			var oz = (rng.call(5) - 0.5) * max_off
-			var fx = cx + ox
-			var fz = cz + oz
-			
-			# Skip if corners overlap road
-			if _is_on_road(fx - w / 2, fz - d / 2) or _is_on_road(fx + w / 2, fz + d / 2):
-				continue
-			if _is_on_road(fx - w / 2, fz + d / 2) or _is_on_road(fx + w / 2, fz - d / 2):
-				continue
-			
-			# Build it
-			var mesh = MeshInstance3D.new()
-			var f_mesh = BoxMesh.new()
-			f_mesh.size = Vector3(w, h, d)
-			mesh.mesh = f_mesh
-			mesh.position = Vector3(fx, h / 2, fz)
+			for ix in range(buildings_per_side):
+				for iz in range(buildings_per_side):
+					# Cell center within block
+					var cx = bx_min + cell_w * (ix + 0.5)
+					var cz = bz_min + cell_d * (iz + 0.5)
+					
+					# Skip if too close to scheme building
+					var too_close = false
+					for b in SCHEME_BUILDINGS:
+						if sqrt((cx - b.x) ** 2 + (cz - b.z) ** 2) < max(b.w, b.d) / 2 + 6:
+							too_close = true
+							break
+					if too_close:
+						continue
+					
+					# Hash-based random for deterministic variation
+					var seed_val = abs((int(cx) * 73856093) ^ (int(cz) * 19349663)) % 99991
+					var rng = func(salt): return float((seed_val * (salt + 1) * 9301 + 49297) % 233280) / 233280
+					
+					# Skip some cells based on district (for variety, not too dense)
+					var skip_chance = 0.0
+					match dist_id:
+						"downtown": skip_chance = 0.10
+						"harbor": skip_chance = 0.30
+						"slums": skip_chance = 0.15
+						"industrial": skip_chance = 0.25
+						"suburbs": skip_chance = 0.40
+					if rng.call(99) < skip_chance:
+						continue
+					
+					# Building dimensions — fit within cell with margin
+					var margin = 2.0
+					var max_w = cell_w - margin * 2
+					var max_d = cell_d - margin * 2
+					var dist = DISTRICTS[dist_id]
+					var w: float
+					var d: float
+					var h: float
+					match dist_id:
+						"downtown":
+							w = min(max_w, 14 + rng.call(1) * 6)
+							d = min(max_d, 12 + rng.call(2) * 6)
+							h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
+						"industrial":
+							w = min(max_w, 16 + rng.call(1) * 8)
+							d = min(max_d, 14 + rng.call(2) * 8)
+							h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
+						"harbor":
+							w = min(max_w, 18 + rng.call(1) * 6)
+							d = min(max_d, 16 + rng.call(2) * 6)
+							h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
+						"slums":
+							w = min(max_w, 8 + rng.call(1) * 4)
+							d = min(max_d, 7 + rng.call(2) * 4)
+							h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
+						_:
+							w = min(max_w, 8 + rng.call(1) * 3)
+							d = min(max_d, 7 + rng.call(2) * 3)
+							h = dist.height_min + rng.call(3) * (dist.height_max - dist.height_min)
+					
+					# District-specific building style
+					_make_district_building(parent, cx, cz, w, d, h, dist_id, rng)
+
+# ============================================================
+# District-specific building styles
+# ============================================================
+
+static func _make_district_building(parent: Node3D, x: float, z: float,
+		w: float, d: float, h: float, dist_id: String, rng: Callable) -> void:
+	var mesh = MeshInstance3D.new()
+	var body = StaticBody3D.new()
+	body.position = Vector3(x, h / 2, z)
+	
+	match dist_id:
+		"downtown":
+			# Tall glass skyscraper — emissive blue/cyan windows
+			var b_mesh = BoxMesh.new()
+			b_mesh.size = Vector3(w, h, d)
+			mesh.mesh = b_mesh
+			mesh.position = Vector3(x, h / 2, z)
 			var mat = StandardMaterial3D.new()
-			# Color palette per district
-			var palette: Array
-			match dist_id:
-				"downtown":
-					palette = ["#475569", "#334155", "#1e293b", "#64748b", "#3f3f46"]
-				"harbor":
-					palette = ["#1c1917", "#292524", "#44403c", "#1f2937"]
-				"slums":
-					palette = ["#7c2d12", "#9a3412", "#451a03", "#1c1917", "#57534e"]
-				"industrial":
-					palette = ["#3f3f46", "#525252", "#27272a", "#404040"]
-				_:
-					palette = ["#525252", "#737373", "#404040", "#a3a3a3"]
-			mat.albedo_color = Color.from_string(palette[int(rng.call(6) * palette.size()) % palette.size()], Color.GRAY)
-			mat.roughness = 0.85
+			var colors = ["#1e293b", "#0f172a", "#1e3a5f", "#1e293b"]
+			mat.albedo_color = Color.from_string(colors[int(rng.call(1) * 4) % 4], Color.DIM_GRAY)
+			mat.metalness = 0.6
+			mat.roughness = 0.25
+			mat.emission_enabled = true
+			mat.emission = Color(0.3, 0.5, 0.7)
+			mat.emission_energy_multiplier = 0.2
 			mesh.material_override = mat
-			parent.add_child(mesh)
-			
-			# Collision
-			var body = StaticBody3D.new()
-			body.position = Vector3(fx, h / 2, fz)
-			var col = CollisionShape3D.new()
-			var shape = BoxShape3D.new()
-			shape.size = Vector3(w, h, d)
-			col.shape = shape
-			body.add_child(col)
-			parent.add_child(body)
+		"harbor":
+			# Low warehouse — flat dark box with roof detail
+			var b_mesh = BoxMesh.new()
+			b_mesh.size = Vector3(w, h, d)
+			mesh.mesh = b_mesh
+			mesh.position = Vector3(x, h / 2, z)
+			var mat = StandardMaterial3D.new()
+			var colors = ["#1c1917", "#292524", "#44403c", "#1f2937"]
+			mat.albedo_color = Color.from_string(colors[int(rng.call(1) * 4) % 4], Color.DIM_GRAY)
+			mat.roughness = 0.95
+			mesh.material_override = mat
+		"slums":
+			# Small rundown house — brown/red brick, smaller scale
+			var b_mesh = BoxMesh.new()
+			b_mesh.size = Vector3(w, h, d)
+			mesh.mesh = b_mesh
+			mesh.position = Vector3(x, h / 2, z)
+			var mat = StandardMaterial3D.new()
+			var colors = ["#7c2d12", "#9a3412", "#451a03", "#57534e", "#78350f"]
+			mat.albedo_color = Color.from_string(colors[int(rng.call(1) * 5) % 5], Color.DIM_GRAY)
+			mat.roughness = 1.0
+			mesh.material_override = mat
+		"industrial":
+			# Factory — wide gray box with metallic look
+			var b_mesh = BoxMesh.new()
+			b_mesh.size = Vector3(w, h, d)
+			mesh.mesh = b_mesh
+			mesh.position = Vector3(x, h / 2, z)
+			var mat = StandardMaterial3D.new()
+			var colors = ["#3f3f46", "#525252", "#27272a", "#404040"]
+			mat.albedo_color = Color.from_string(colors[int(rng.call(1) * 4) % 4], Color.DIM_GRAY)
+			mat.metalness = 0.3
+			mat.roughness = 0.7
+			mesh.material_override = mat
+		_:
+			# Suburbs — small house with garden, lighter colors
+			var b_mesh = BoxMesh.new()
+			b_mesh.size = Vector3(w, h, d)
+			mesh.mesh = b_mesh
+			mesh.position = Vector3(x, h / 2, z)
+			var mat = StandardMaterial3D.new()
+			var colors = ["#a3a3a3", "#d4d4d4", "#f5f5f5", "#e5e5e5", "#bfbfbf"]
+			mat.albedo_color = Color.from_string(colors[int(rng.call(1) * 5) % 5], Color.DIM_GRAY)
+			mat.roughness = 0.9
+			mesh.material_override = mat
+	
+	parent.add_child(mesh)
+	# Collision
+	var col = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+	shape.size = Vector3(w, h, d)
+	col.shape = shape
+	body.add_child(col)
+	parent.add_child(body)
 
 static func _is_on_road(x: float, z: float) -> bool:
-	# Main avenues at ±100
-	for pos in [-100, 100]:
-		if abs(z - pos) < ROAD_HALF_MAIN + SIDEWALK and abs(x) < 360:
+	# Main avenues at -200, 0, +200 (with sidewalk buffer)
+	var road_buffer = ROAD_HALF_MAIN + SIDEWALK
+	for pos in [-200, 0, 200]:
+		if abs(z - pos) < road_buffer and abs(x) < 380:
 			return true
-		if abs(x - pos) < ROAD_HALF_MAIN + SIDEWALK and abs(z) < 360:
-			return true
-	# Secondary streets every 50m
-	for p in range(-300, 301, 50):
-		if p == -100 or p == 100:
-			continue
-		if abs(z - p) < ROAD_HALF_SIDE + SIDEWALK and abs(x) < 360:
-			return true
-		if abs(x - p) < ROAD_HALF_SIDE + SIDEWALK and abs(z) < 360:
+		if abs(x - pos) < road_buffer and abs(z) < 380:
 			return true
 	return false
 
