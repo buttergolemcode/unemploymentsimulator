@@ -44,7 +44,9 @@ func _build_mesh():
 		# Quaternius characters are roughly 1.8m tall, scale to match our collision
 		instance.scale = Vector3(1.0, 1.0, 1.0)
 		# Rotate to face forward (FBX may have different default orientation)
-		instance.rotation.y = PI  # face -Z (forward in our world)
+		# Note: Quaternius characters face -Z by default (forward in Godot),
+		# so no rotation needed. If a model faces +Z, add PI here.
+		# instance.rotation.y = PI  # uncomment if model faces wrong way
 		mesh.add_child(instance)
 		# Add merchant badge if applicable
 		if is_merchant:
@@ -158,7 +160,7 @@ func _physics_process(delta):
 		rotation.y = facing
 		walk_phase += delta * 8
 		# Walk bob animation (procedural — will be replaced with real anim later)
-		mesh.position.y = abs(sin(walk_phase)) * 0.06
+		mesh.position.y = abs(sin(walk_phase)) * 0.03  # subtle bob (was 0.06)
 		# Subtle forward lean when walking
 		mesh.rotation.x = lerp(mesh.rotation.x, 0.08, delta * 5.0)
 		move_and_slide()

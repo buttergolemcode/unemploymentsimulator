@@ -200,7 +200,8 @@ func _build_mesh():
         if packed_scene != null:
                 var instance = packed_scene.instantiate()
                 instance.scale = Vector3(1.0, 1.0, 1.0)
-                instance.rotation.y = PI  # face -Z (forward)
+                # Quaternius characters face -Z by default, no rotation needed
+                # instance.rotation.y = PI  # uncomment if model faces wrong way
                 mesh_node.add_child(instance)
                 return
 

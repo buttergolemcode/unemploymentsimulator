@@ -24,6 +24,10 @@ var _front_wheels: Array = []
 var _rear_wheels: Array = []
 # Last steering input for body-roll animation
 var _last_steer: float = 0.0
+# True when using box-mesh fallback (FBX wheel animation is unreliable
+# because the wheel nodes have baked orientations that conflict with our
+# rotate_x / rotation.y assignments)
+var _use_box_mesh: bool = false
 
 func _ready():
 	add_to_group("vehicle")
@@ -172,6 +176,7 @@ func _build_box_mesh():
 	# because CarMesh is rotated 180° via rotation.y = yaw + PI)
 	_front_wheels = [_wheel_nodes[0], _wheel_nodes[1]]
 	_rear_wheels = [_wheel_nodes[2], _wheel_nodes[3]]
+	_use_box_mesh = true  # enable wheel animation in _animate_wheels_and_body
 
 	_add_lights()
 
@@ -277,32 +282,31 @@ func _physics_process(delta):
 
 func _animate_wheels_and_body(delta: float, current_steer: float):
 	var abs_speed = abs(speed)  # used by both front-wheel + body-roll sections
-	# Wheel spin: rotate around local X axis based on speed
-	# (wheels are typically rotated so their spin axis is X in local space)
-	var spin_rate = speed * 3.0  # rad/s, tuned for visual feel
-	for wheel in _wheel_nodes:
-		# Wheel local rotation: rotate around X
-		# Use rotate_x for accumulated rotation (don't set rotation.x directly
-		# because the wheel may have a base rotation for orientation)
-		wheel.rotate_x(spin_rate * delta)
-	
-	# Front wheel steering: turn front wheels left/right based on steer input.
-	# Realistic max steering angle ~30 degrees at full lock (low speed),
-	# reduced at high speed for stability (matches steering authority bell curve).
-	var steer_visual_factor: float
-	if abs_speed < 1.0:
-		steer_visual_factor = 1.0  # full lock allowed at standstill for visual
-	elif abs_speed < 5.0:
-		steer_visual_factor = 1.0  # still full lock at low speed
-	else:
-		# Reduce visible steering angle at higher speeds
-		steer_visual_factor = clamp(1.0 - (abs_speed - 5.0) / 17.0, 0.3, 1.0)
-	# Target Y rotation: steer (left=-1, right=+1) * max_angle (in radians)
-	# 0.5 rad = ~28 degrees, matches real car full lock
-	var target_steer_angle = current_steer * 0.5 * steer_visual_factor
-	for wheel in _front_wheels:
-		# Smoothly interpolate to target steering angle (lerp for natural feel)
-		wheel.rotation.y = lerp(wheel.rotation.y, target_steer_angle, delta * 8.0)
+	# Wheel spin + steering: ONLY animate for box-mesh fallback.
+	# For real FBX car models, the wheel nodes have baked orientations
+	# (e.g. cylinders rotated for visual alignment). Adding rotate_x or
+	# setting rotation.y breaks the orientation and the wheels glitch
+	# into the car body. We skip animation until proper pivot-node setup
+	# is implemented.
+	if _use_box_mesh:
+		# Wheel spin: rotate around local X axis based on speed
+		var spin_rate = speed * 3.0  # rad/s, tuned for visual feel
+		for wheel in _wheel_nodes:
+			wheel.rotate_x(spin_rate * delta)
+		
+		# Front wheel steering: turn front wheels left/right based on steer input.
+		# Realistic max steering angle ~30 degrees at full lock (low speed),
+		# reduced at high speed for stability.
+		var steer_visual_factor: float
+		if abs_speed < 1.0:
+			steer_visual_factor = 1.0
+		elif abs_speed < 5.0:
+			steer_visual_factor = 1.0
+		else:
+			steer_visual_factor = clamp(1.0 - (abs_speed - 5.0) / 17.0, 0.3, 1.0)
+		var target_steer_angle = current_steer * 0.5 * steer_visual_factor
+		for wheel in _front_wheels:
+			wheel.rotation.y = lerp(wheel.rotation.y, target_steer_angle, delta * 8.0)
 
 	# Body roll: lean into turns based on steer input and speed
 	# More speed + more steer = more roll. Cap at small angle for subtlety.
