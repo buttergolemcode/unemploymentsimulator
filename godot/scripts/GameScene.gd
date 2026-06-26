@@ -65,13 +65,12 @@ func _spawn_vehicles():
 		# Collision
 		var col = CollisionShape3D.new()
 		var shape = BoxShape3D.new()
-		# Collision box with GROUND CLEARANCE (like real car chassis)
-		# Box bottom at y=0.2 (20cm clearance above road) — car can drive
-		# over sidewalks (15cm) and small obstacles without getting stuck.
-		# Wheels (visual) reach down to y=0 to show ground contact.
-		shape.size = Vector3(1.9, 1.2, 4.3)
+		# Vehicle collision box — bottom at y=0 (ground level)
+		# Sidewalks/park now have their own collision, so car will naturally
+		# drive onto them via floor_snap. No fake ground clearance needed.
+		shape.size = Vector3(1.9, 1.4, 4.3)
 		col.shape = shape
-		col.position = Vector3(0, 0.8, 0)  # center at y=0.8, bottom at y=0.2
+		col.position = Vector3(0, 0.7, 0)  # center at y=0.7, bottom at y=0.0
 		vehicle.add_child(col)
 		
 		# Mesh container

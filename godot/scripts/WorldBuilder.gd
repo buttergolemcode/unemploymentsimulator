@@ -423,18 +423,36 @@ static func _make_sidewalk_segment(parent: Node3D, axis: String, pos: float,
 	var seg_center = seg_start + seg_len / 2
 	var sidewalk = MeshInstance3D.new()
 	var s_mesh = BoxMesh.new()
+	var sx: float
+	var sz: float
 	if axis == "x":
 		s_mesh.size = Vector3(seg_len, SIDEWALK_HEIGHT, SIDEWALK_WIDTH)
-		sidewalk.position = Vector3(seg_center, SIDEWALK_HEIGHT / 2, pos + side * (ROAD_HALF_WIDTH + SIDEWALK_WIDTH / 2))
+		sx = seg_center
+		sz = pos + side * (ROAD_HALF_WIDTH + SIDEWALK_WIDTH / 2)
+		sidewalk.position = Vector3(sx, SIDEWALK_HEIGHT / 2, sz)
 	else:
 		s_mesh.size = Vector3(SIDEWALK_WIDTH, SIDEWALK_HEIGHT, seg_len)
-		sidewalk.position = Vector3(pos + side * (ROAD_HALF_WIDTH + SIDEWALK_WIDTH / 2), SIDEWALK_HEIGHT / 2, seg_center)
+		sx = pos + side * (ROAD_HALF_WIDTH + SIDEWALK_WIDTH / 2)
+		sz = seg_center
+		sidewalk.position = Vector3(sx, SIDEWALK_HEIGHT / 2, sz)
 	sidewalk.mesh = s_mesh
 	var smat = StandardMaterial3D.new()
-	smat.albedo_color = Color(0.55, 0.55, 0.55)  # light gray NYC concrete
+	smat.albedo_color = Color(0.55, 0.55, 0.55)
 	smat.roughness = 0.9
 	sidewalk.material_override = smat
 	parent.add_child(sidewalk)
+	# COLLISION: StaticBody3D so cars/player can drive/walk on sidewalk
+	var body = StaticBody3D.new()
+	body.position = Vector3(sx, SIDEWALK_HEIGHT / 2, sz)
+	var col = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+	if axis == "x":
+		shape.size = Vector3(seg_len, SIDEWALK_HEIGHT, SIDEWALK_WIDTH)
+	else:
+		shape.size = Vector3(SIDEWALK_WIDTH, SIDEWALK_HEIGHT, seg_len)
+	col.shape = shape
+	body.add_child(col)
+	parent.add_child(body)
 
 static func _make_dash(parent: Node3D, axis: String, pos: float, t: float) -> void:
 	var dash = MeshInstance3D.new()
@@ -477,10 +495,19 @@ static func _make_sidewalk_corner(parent: Node3D, x: float, z: float) -> void:
 	corner.mesh = c_mesh
 	corner.position = Vector3(x, SIDEWALK_HEIGHT / 2, z)
 	var smat = StandardMaterial3D.new()
-	smat.albedo_color = Color(0.55, 0.55, 0.55)  # match sidewalk color
+	smat.albedo_color = Color(0.55, 0.55, 0.55)
 	smat.roughness = 0.9
 	corner.material_override = smat
 	parent.add_child(corner)
+	# COLLISION: StaticBody3D so cars/player can stand on corner
+	var body = StaticBody3D.new()
+	body.position = Vector3(x, SIDEWALK_HEIGHT / 2, z)
+	var col = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+	shape.size = Vector3(SIDEWALK_WIDTH, SIDEWALK_HEIGHT, SIDEWALK_WIDTH)
+	col.shape = shape
+	body.add_child(col)
+	parent.add_child(body)
 
 static func _make_crosswalk(parent: Node3D, x: float, z: float, axis: String) -> void:
 	# Zebra stripes: white bars across the FULL width of the street
@@ -983,12 +1010,21 @@ static func _park(parent: Node3D, x: float, z: float, w: float, d: float) -> voi
 	var g_mesh = BoxMesh.new()
 	g_mesh.size = Vector3(w, 0.12, d)
 	grass.mesh = g_mesh
-	grass.position = Vector3(x, 0.06, z)  # raised to clear terrain (y=-0.05)
+	grass.position = Vector3(x, 0.06, z)
 	var gmat = StandardMaterial3D.new()
-	gmat.albedo_color = Color(0.18, 0.35, 0.15)  # green grass
+	gmat.albedo_color = Color(0.18, 0.35, 0.15)
 	gmat.roughness = 1.0
 	grass.material_override = gmat
 	parent.add_child(grass)
+	# COLLISION: StaticBody3D so cars/player can walk on park grass
+	var grass_body = StaticBody3D.new()
+	grass_body.position = Vector3(x, 0.06, z)
+	var grass_col = CollisionShape3D.new()
+	var grass_shape = BoxShape3D.new()
+	grass_shape.size = Vector3(w, 0.12, d)
+	grass_col.shape = grass_shape
+	grass_body.add_child(grass_col)
+	parent.add_child(grass_body)
 	# Border curb (raised edge around the park, like sidewalk edge)
 	var curb_height = 0.2
 	var curb_width = 0.3
