@@ -134,15 +134,13 @@ Asset directory structure established, inventory README in place.
 #### D.2 — Vehicle model integration (Quaternius Cars) ✅
 Replace box-mesh vehicles with real Quaternius car models. Add wheel-spin, front-wheel steering, body roll/pitch animations. Free-look chase camera.
 
-#### D.3 — NPC model integration (Quaternius Animated Characters) ⬅️ NEXT
-- Import character pack → multiple `.glb` scenes with AnimationPlayer (idle, walk, run)
-- Set up shared AnimationLibrary across characters
-- Replace capsule NPCs with animated characters
-- Walk animation replaces the `mesh.position.y = abs(sin(walk_phase)) * 0.06` hack
-- Idle animation when NPC reaches target
-- 'Scream' animation on vehicle knockdown
-- Update player model too (third-person view)
-- Prerequisite: Blender installed and path set in Godot Editor Settings
+#### D.3 — NPC model integration (Quaternius Modular Characters) ✅
+- Replaced capsule NPCs with 11 real character models (Adventurer, Beach, Casual, Casual2, Farmer, King, Punk, Spacesuit, Suit, Swat, Worker)
+- Player uses "Suit" character model in third-person view
+- Walk animation: procedural bob + forward lean (real animations pending)
+- Idle/knockdown states preserved
+- Fallback to capsule mesh if FBX missing
+- Source: Quaternius Ultimate Modular Characters Pack (CC0, FBX format)
 
 #### D.4 — Building system overhaul (Kenney City Kit)
 - Build a **MeshLibrary** from Kenney modular building parts

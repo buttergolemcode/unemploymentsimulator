@@ -8,6 +8,28 @@ Format: entries are grouped by Sprint sub-step, newest first. Each entry has the
 
 ## Sprint D — Assets & Map Polish
 
+### D.3 — NPC model integration ✅
+
+**Commit `4595322` (2026-06-26): Quaternius Modular Characters integration**
+- Downloaded Quaternius Ultimate Modular Characters Pack via gdown from Google Drive
+- 12 FBX files added to `godot/assets/quaternius_modular_chars/FBX/`:
+  Adventurer, Beach, Casual, Casual2, Farmer, King, Punk, Spacesuit, Suit, Swat, Worker + Humans_Master
+- `NPC.gd`: Added `CHARACTER_MODELS` const (11 names), `get_model_path()` static helper
+- `NPC.gd _build_mesh()`: Loads random character FBX, falls back to capsule
+- `NPC.gd`: Added walk forward lean (`mesh.rotation.x = lerp(..., 0.08, delta * 5.0)`)
+- `PlayerController.gd _build_mesh()`: Loads `Suit.fbx` as player model
+- `PlayerController.gd`: Extracted `_build_capsule_mesh(mesh_node)` as fallback helper
+- Merchant badge added separately on top of real character model
+- Existing knockdown state + walk bob preserved
+
+**Note on animations:** Universal Animation Library (120+ anims) could not be
+downloaded — itch.io purchase flow blocks scripted downloads. Using procedural
+walk bob + forward lean for now. Real animations will be integrated when available.
+
+**Commit `52ed661` (2026-06-26): Cleanup**
+- Removed accidentally committed HTML files (char_page.html, page.html, search.html)
+- Updated `.gitignore` to exclude *.html (except index.html)
+
 ### D.2 — Vehicle model integration ✅
 
 **Commit `b564d53` (2026-06-26): Front-wheel steering animation**
