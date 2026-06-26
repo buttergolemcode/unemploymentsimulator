@@ -454,24 +454,35 @@ static func _make_sidewalk_segment(parent: Node3D, axis: String, pos: float,
 	body.add_child(col)
 	parent.add_child(body)
 	
-	# STEP COLLISION: Thin low box extending slightly into street
-	# Creates a 5cm step (small enough for floor_snap to handle) that bridges
-	# the gap between street (y=0) and sidewalk (y=0.15). Car drives over this
-	# small step and floor_snap pulls it up onto sidewalk surface.
-	var step_height = 0.05  # 5cm step — small enough for floor_snap (0.5m)
-	var step_depth = 0.5    # extends 50cm into street from sidewalk edge
-	var step_body = StaticBody3D.new()
-	var step_col = CollisionShape3D.new()
-	var step_shape = BoxShape3D.new()
+	# RAMP COLLISION: Rotated box forming smooth slope from street to sidewalk
+	# More reliable than steps — CharacterBody3D can drive up slopes but not steps.
+	# Ramp: 60cm long, rotated ~14° so it goes from y=0 (street) to y=0.15 (sidewalk).
+	var ramp_length = 0.6   # 60cm ramp length
+	var ramp_thickness = 0.05
+	# Angle: arctan(SIDEWALK_HEIGHT / ramp_length) — slope angle
+	var ramp_angle = atan(SIDEWALK_HEIGHT / ramp_length)
+	# Hypotenuse length (actual box length needed)
+	var ramp_box_len = sqrt(ramp_length * ramp_length + SIDEWALK_HEIGHT * SIDEWALK_HEIGHT)
+	var ramp_body = StaticBody3D.new()
+	var ramp_col = CollisionShape3D.new()
+	var ramp_shape = BoxShape3D.new()
+	# Ramp center position: midpoint between street edge and sidewalk edge
+	# Street edge: sz + (-side * SIDEWALK_WIDTH / 2)
+	# Sidewalk edge: sz + (side * SIDEWALK_WIDTH / 2) — but ramp starts at street edge
+	# Ramp midpoint: at street edge + ramp_length/2 toward sidewalk, height SIDEWALK_HEIGHT/2
+	var ramp_mid_offset = -side * (SIDEWALK_WIDTH / 2) + side * (ramp_length / 2)
+	var ramp_height = SIDEWALK_HEIGHT / 2
 	if axis == "x":
-		step_shape.size = Vector3(seg_len, step_height, step_depth)
-		step_body.position = Vector3(sx, step_height / 2, sz + (-side * (SIDEWALK_WIDTH / 2 + step_depth / 2)))
+		ramp_shape.size = Vector3(seg_len, ramp_thickness, ramp_box_len)
+		ramp_body.position = Vector3(sx, ramp_height, sz + ramp_mid_offset)
+		ramp_body.rotation.x = -side * ramp_angle  # tilt to slope up toward sidewalk
 	else:
-		step_shape.size = Vector3(step_depth, step_height, seg_len)
-		step_body.position = Vector3(sx + (-side * (SIDEWALK_WIDTH / 2 + step_depth / 2)), step_height / 2, sz)
-	step_col.shape = step_shape
-	step_body.add_child(step_col)
-	parent.add_child(step_body)
+		ramp_shape.size = Vector3(ramp_box_len, ramp_thickness, seg_len)
+		ramp_body.position = Vector3(sx + ramp_mid_offset, ramp_height, sz)
+		ramp_body.rotation.z = side * ramp_angle  # tilt to slope up toward sidewalk
+	ramp_col.shape = ramp_shape
+	ramp_body.add_child(ramp_col)
+	parent.add_child(ramp_body)
 
 static func _make_dash(parent: Node3D, axis: String, pos: float, t: float) -> void:
 	var dash = MeshInstance3D.new()
