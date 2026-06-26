@@ -327,7 +327,10 @@ func _animate_wheels_and_body(delta: float, current_steer: float):
 		steer_visual_factor = 1.0
 	else:
 		steer_visual_factor = clamp(1.0 - (abs_speed - 5.0) / 17.0, 0.3, 1.0)
-	var target_steer_angle = current_steer * 0.5 * steer_visual_factor
+	# Negative sign: A=left (steer=-1) should turn wheels LEFT visually.
+	# pivot.rotation.y = +X rotates counterclockwise when viewed from top,
+	# so positive steer (right) needs negative rotation. Hence the minus sign.
+	var target_steer_angle = -current_steer * 0.5 * steer_visual_factor
 	for pivot in _front_wheel_pivots:
 		pivot.rotation.y = lerp(pivot.rotation.y, target_steer_angle, delta * 8.0)
 	
