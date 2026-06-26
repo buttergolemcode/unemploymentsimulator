@@ -78,21 +78,21 @@ func _spawn_vehicles():
 		add_child(vehicle)
 
 func _spawn_npcs():
-	# Merchants near scheme buildings (positions match new D.4 layout)
+	# Merchants near scheme buildings (positions match new D.4 v2 layout)
 	var merchant_positions = [
 		# Downtown merchants (financial district)
-		{"x": -35, "z": -35, "color": "#16a34a", "district": "downtown"},
-		{"x": 25, "z": -45, "color": "#16a34a", "district": "downtown"},
-		{"x": -55, "z": -5, "color": "#16a34a", "district": "downtown"},
-		{"x": 45, "z": 25, "color": "#16a34a", "district": "downtown"},
+		{"x": -90, "z": -45, "color": "#16a34a", "district": "downtown"},
+		{"x": 110, "z": -75, "color": "#16a34a", "district": "downtown"},
+		{"x": -140, "z": 55, "color": "#16a34a", "district": "downtown"},
+		{"x": 130, "z": 95, "color": "#16a34a", "district": "downtown"},
 		# Slums merchants (drugs/scam/robbery)
-		{"x": -145, "z": 75, "color": "#b91c1c", "district": "slums"},
-		{"x": -115, "z": 135, "color": "#b91c1c", "district": "slums"},
-		{"x": -155, "z": 145, "color": "#b91c1c", "district": "slums"},
+		{"x": -290, "z": 275, "color": "#b91c1c", "district": "slums"},
+		{"x": -240, "z": 325, "color": "#b91c1c", "district": "slums"},
+		{"x": -320, "z": 345, "color": "#b91c1c", "district": "slums"},
 		# Industrial merchant (e-com)
-		{"x": -125, "z": -55, "color": "#d97706", "district": "industrial"},
+		{"x": -270, "z": -245, "color": "#d97706", "district": "industrial"},
 		# Harbor merchant
-		{"x": 150, "z": 0, "color": "#7e22ce", "district": "harbor"},
+		{"x": 230, "z": 0, "color": "#7e22ce", "district": "harbor"},
 	]
 	for mp in merchant_positions:
 		_spawn_npc(mp.x, mp.z, mp.color, mp.district, true)
@@ -146,14 +146,14 @@ func _spawn_npc_in_district(district: String, color: String):
 		return
 
 func _get_district_bounds(d: String) -> Array:
-	# Bounds match D.4 map layout (x_min, x_max, z_min, z_max)
+	# Bounds match D.4 v2 island layout (x_min, x_max, z_min, z_max)
 	match d:
-		"downtown": return [-80, 80, -80, 80]
-		"harbor": return [80, 260, -100, 180]
-		"slums": return [-180, -80, 40, 180]
-		"industrial": return [-180, -80, -120, 40]
-		"suburbs": return [-180, 120, -120, 80]  # west + east combined
-		_: return [-220, 220, -220, 220]  # rural = everything else
+		"downtown": return [-200, 200, -150, 200]
+		"harbor": return [200, 400, -300, 300]
+		"slums": return [-400, -150, 200, 400]
+		"industrial": return [-400, -150, -400, -100]
+		"suburbs": return [-400, -150, -100, 200]
+		_: return [-380, 380, -380, 380]  # rural + water
 
 func _process(delta):
 	elapsed_time += delta
