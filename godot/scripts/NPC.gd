@@ -125,7 +125,6 @@ func _physics_process(delta):
 	# Handle knockdown state
 	if is_down:
 		down_timer -= delta
-		# Stay down, slowly recover
 		mesh.rotation.x = lerp(mesh.rotation.x, -PI / 2, delta * 5)
 		velocity = Vector3.ZERO
 		move_and_slide()
@@ -139,10 +138,8 @@ func _physics_process(delta):
 	for vehicle in get_tree().get_nodes_in_group("vehicle"):
 		var vd = global_position.distance_to(vehicle.global_position)
 		if vd < 2.5 and abs(vehicle.speed) > 3.0:
-			# Knocked down by vehicle
 			is_down = true
-			down_timer = 4.0  # down for 4 seconds
-			# Knockback in vehicle's movement direction
+			down_timer = 4.0
 			var kb_dir = (global_position - vehicle.global_position).normalized()
 			velocity = kb_dir * 5.0
 			move_and_slide()
@@ -155,21 +152,47 @@ func _physics_process(delta):
 	if dist < 0.5:
 		_pick_new_target()
 	else:
+		# Check if next position would be on a street — if so, pick new target
+		var next_x = global_position.x + (dx / dist) * 2.0
+		var next_z = global_position.z + (dz / dist) * 2.0
+		if _is_on_street(next_x, next_z):
+			_pick_new_target()
+			return
 		velocity = Vector3(dx / dist * speed, 0, dz / dist * speed)
-		# Godot Y-rotation convention: forward = (-sin(yaw), 0, -cos(yaw))
-		# We want forward to equal movement direction (dx, dz), so:
-		# -sin(yaw) = dx/dist, -cos(yaw) = dz/dist
-		# yaw = atan2(-dx, -dz)
 		facing = atan2(-dx, -dz)
 		rotation.y = facing
 		walk_phase += delta * 8
-		# Walk bob animation (procedural — will be replaced with real anim later)
-		mesh.position.y = abs(sin(walk_phase)) * 0.03  # subtle bob (was 0.06)
-		# Subtle forward lean when walking
+		mesh.position.y = abs(sin(walk_phase)) * 0.03
 		mesh.rotation.x = lerp(mesh.rotation.x, 0.08, delta * 5.0)
 		move_and_slide()
 
+# Streets are at positions [-300, -200, -100, 0, 100, 200, 300] in both axes
+# with ROAD_HALF_WIDTH (4m) buffer. NPCs should stay on sidewalks (outside this buffer).
+static var STREET_POSITIONS: Array = [-300, -200, -100, 0, 100, 200, 300]
+static var ROAD_HALF: float = 4.5  # 4m half-width + 0.5m buffer
+
+static func _is_on_street(x: float, z: float) -> bool:
+	# Check if position is on a street (within road half-width of any street line)
+	for pos in STREET_POSITIONS:
+		# East-West street at z=pos
+		if abs(z - pos) < ROAD_HALF and abs(x) < 380:
+			return true
+		# North-South street at x=pos
+		if abs(x - pos) < ROAD_HALF and abs(z) < 380:
+			return true
+	return false
+
 func _pick_new_target():
+	# Try to find a target that's NOT on a street (keep NPC on sidewalks/buildings)
+	for attempt in range(10):
+		var angle = randf() * TAU
+		var dist = 8 + randf() * 20  # shorter range, stay near current block
+		var candidate = global_position + Vector3(cos(angle) * dist, 0, sin(angle) * dist)
+		# Skip if candidate is on a street
+		if not _is_on_street(candidate.x, candidate.z):
+			target_pos = candidate
+			return
+	# Fallback: just pick any nearby point (NPC may briefly cross street)
 	var angle = randf() * TAU
-	var dist = 15 + randf() * 25
+	var dist = 8 + randf() * 15
 	target_pos = global_position + Vector3(cos(angle) * dist, 0, sin(angle) * dist)

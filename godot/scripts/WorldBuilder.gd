@@ -25,9 +25,9 @@ extends RefCounted
 #   suburbs: west, small houses
 #   rural: outside city, farms/forest
 
-const MAP_SIZE: float = 800.0           # playable area (-400..+400)
-const WATER_OFFSET: float = 400.0       # water starts at this distance from center
-const WATER_PLANE_SIZE: float = 1600.0  # large enough to look infinite
+const MAP_SIZE: float = 1200.0          # playable area (-600..+600)
+const WATER_OFFSET: float = 600.0       # water starts at this distance from center
+const WATER_PLANE_SIZE: float = 2400.0  # large enough to look infinite
 
 # Street grid (NYC-style 100m blocks)
 const STREET_GRID: Array = [-300, -200, -100, 0, 100, 200, 300]
@@ -53,7 +53,7 @@ static func _init_districts() -> void:
 		"harbor": {
 			"color": "#1c1917", "height_min": 10, "height_max": 25, "ground": "#171717",
 			"polygon": PackedVector2Array([
-				Vector2(200, -300), Vector2(400, -300), Vector2(400, 300), Vector2(200, 300)
+				Vector2(400, -400), Vector2(600, -400), Vector2(600, 400), Vector2(400, 400)
 			])
 		},
 		"slums": {
@@ -131,13 +131,13 @@ static func get_district_at(x: float, z: float) -> String:
 
 static func terrain_height(x: float, z: float) -> float:
 	var r = sqrt(x * x + z * z)
-	# City area: completely flat
-	if r < 380:
+	# City area: completely flat (extended for larger map)
+	if r < 580:
 		return 0.0
-	# Rural edge: gentle hills rising toward mountains
+	# Rural edge: gentle hills rising toward mountains (extended range)
 	if r < WATER_OFFSET:
-		var blend = (r - 380) / (WATER_OFFSET - 380)
-		return _fractal_noise(x, z, 2) * 6 * blend
+		var blend = (r - 580) / (WATER_OFFSET - 580)
+		return _fractal_noise(x, z, 2) * 8 * blend
 	# Water (below sea level)
 	return -3.0
 
@@ -191,8 +191,8 @@ static func build_world(parent: Node3D) -> void:
 
 static func _build_terrain(parent: Node3D) -> void:
 	# Visual terrain mesh with height variation
-	var size = 900
-	var segs = 100
+	var size = 1400  # larger terrain mesh for bigger map
+	var segs = 120
 	var mesh = PlaneMesh.new()
 	mesh.size = Vector2(size, size)
 	mesh.subdivide_width = segs
@@ -248,68 +248,72 @@ static func _build_terrain(parent: Node3D) -> void:
 	city_body.name = "CityGround"
 	var city_col = CollisionShape3D.new()
 	var city_shape = BoxShape3D.new()
-	city_shape.size = Vector3(800, 1.0, 800)  # 800x800 flat ground at y=-0.5
+	city_shape.size = Vector3(1200, 1.0, 1200)  # 1200x1200 flat ground (covers city + inner rural)
 	city_col.shape = city_shape
 	city_col.position = Vector3(0, -0.5, 0)
 	city_body.add_child(city_col)
 	parent.add_child(city_body)
 	
-	# 2) Rural raised collision (4 boxes at corners, matching terrain_height)
+	# 2) Rural raised collision (DENSE GRID covering entire rural area)
+	# Old approach (12 boxes around perimeter) left gaps where cars fell through.
+	# New approach: grid of 50x50m boxes covering the full rural ring (380-580m radius)
 	var rural_body = StaticBody3D.new()
 	rural_body.name = "RuralGround"
-	# Add multiple collision boxes around the rural perimeter
-	for angle_deg in range(0, 360, 30):
-		var angle = deg_to_rad(angle_deg)
-		var rx = cos(angle) * 390.0  # radius just inside water
-		var rz = sin(angle) * 390.0
-		var rcol = CollisionShape3D.new()
-		var rshape = BoxShape3D.new()
-		rshape.size = Vector3(80, 1.0, 80)
-		rcol.shape = rshape
-		var h_at = terrain_height(rx, rz)
-		rcol.position = Vector3(rx, h_at - 0.5, rz)
-		rural_body.add_child(rcol)
+	var rural_grid = 50  # 50m spacing
+	for gx in range(-600, 601, rural_grid):
+		for gz in range(-600, 601, rural_grid):
+			var r = sqrt(gx * gx + gz * gz)
+			# Only place boxes in rural ring (between city edge and water)
+			if r < 380 or r > 580:
+				continue
+			var rcol = CollisionShape3D.new()
+			var rshape = BoxShape3D.new()
+			rshape.size = Vector3(rural_grid, 1.0, rural_grid)
+			rcol.shape = rshape
+			var h_at = terrain_height(gx, gz)
+			rcol.position = Vector3(gx, h_at - 0.5, gz)
+			rural_body.add_child(rcol)
 	parent.add_child(rural_body)
 	
-	# 3) Mountain walls (impassable barriers at map edges)
-	# North wall (z < -400)
+	# 3) Mountain walls (impassable barriers at map edges — extended for larger map)
+	# North wall (z < -600)
 	var north_body = StaticBody3D.new()
 	north_body.name = "MountainNorth"
 	var north_col = CollisionShape3D.new()
 	var north_shape = BoxShape3D.new()
-	north_shape.size = Vector3(1200, 100, 200)
+	north_shape.size = Vector3(1800, 100, 200)
 	north_col.shape = north_shape
-	north_col.position = Vector3(0, 50, -500)
+	north_col.position = Vector3(0, 50, -700)
 	north_body.add_child(north_col)
 	parent.add_child(north_body)
-	# South wall (z > 400)
+	# South wall (z > 600)
 	var south_body = StaticBody3D.new()
 	south_body.name = "MountainSouth"
 	var south_col = CollisionShape3D.new()
 	var south_shape = BoxShape3D.new()
-	south_shape.size = Vector3(1200, 100, 200)
+	south_shape.size = Vector3(1800, 100, 200)
 	south_col.shape = south_shape
-	south_col.position = Vector3(0, 50, 500)
+	south_col.position = Vector3(0, 50, 700)
 	south_body.add_child(south_col)
 	parent.add_child(south_body)
-	# West wall (x < -400)
+	# West wall (x < -600)
 	var west_body = StaticBody3D.new()
 	west_body.name = "MountainWest"
 	var west_col = CollisionShape3D.new()
 	var west_shape = BoxShape3D.new()
-	west_shape.size = Vector3(200, 100, 1200)
+	west_shape.size = Vector3(200, 100, 1800)
 	west_col.shape = west_shape
-	west_col.position = Vector3(-500, 50, 0)
+	west_col.position = Vector3(-700, 50, 0)
 	west_body.add_child(west_col)
 	parent.add_child(west_body)
-	# East harbor wall (low barrier to block ground vehicles from water)
+	# East harbor wall (low barrier at harbor edge)
 	var east_body = StaticBody3D.new()
 	east_body.name = "HarborBarrier"
 	var east_col = CollisionShape3D.new()
 	var east_shape = BoxShape3D.new()
-	east_shape.size = Vector3(20, 4, 1200)
+	east_shape.size = Vector3(20, 4, 1800)
 	east_col.shape = east_shape
-	east_col.position = Vector3(410, 2, 0)
+	east_col.position = Vector3(610, 2, 0)
 	east_body.add_child(east_col)
 	parent.add_child(east_body)
 	
@@ -320,6 +324,7 @@ static func _build_terrain(parent: Node3D) -> void:
 # ============================================================
 
 static func _build_water(parent: Node3D) -> void:
+	# Sea on east side (harbor) + surrounding ocean
 	var plane = PlaneMesh.new()
 	plane.size = Vector2(WATER_PLANE_SIZE, WATER_PLANE_SIZE)
 	var mat = StandardMaterial3D.new()
@@ -330,7 +335,7 @@ static func _build_water(parent: Node3D) -> void:
 	plane.material = mat
 	var mi = MeshInstance3D.new()
 	mi.mesh = plane
-	mi.position = Vector3(800, -3.0, 0)  # east side, below ground
+	mi.position = Vector3(1200, -3.0, 0)  # east side, larger offset for bigger map
 	parent.add_child(mi)
 
 # ============================================================
@@ -350,7 +355,7 @@ static func _build_roads(parent: Node3D) -> void:
 	_build_crosswalks(parent)
 
 static func _make_street(parent: Node3D, axis: String, pos: float) -> void:
-	var length = 800.0  # spans entire city
+	var length = 1100.0  # spans entire city (extended for larger map)
 	# === ASPHALT (street surface, full length — runs through intersections) ===
 	var asphalt = MeshInstance3D.new()
 	var a_mesh = BoxMesh.new()
@@ -801,34 +806,98 @@ static func _build_street_lamps(parent: Node3D) -> void:
 # ============================================================
 
 static func _build_dock_props(parent: Node3D) -> void:
-	# Cargo containers in harbor district
-	for i in range(40):
-		var x = 220 + randf() * 150
-		var z = -250 + randf() * 500
-		if get_district_at(x, z) != "harbor":
-			continue
+	# === HARBOR BASIN (water inlet for ships) ===
+	# Cut a rectangular basin into the harbor area for ships to dock
+	var basin = MeshInstance3D.new()
+	var b_mesh = BoxMesh.new()
+	b_mesh.size = Vector3(200, 0.1, 300)  # 200x300m harbor basin
+	basin.mesh = b_mesh
+	basin.position = Vector3(500, -2.5, 0)  # at water level, in harbor area
+	var basin_mat = StandardMaterial3D.new()
+	basin_mat.albedo_color = Color(0.05, 0.15, 0.28)  # dark water
+	basin_mat.roughness = 0.1
+	basin_mat.metalness = 0.6
+	basin.material_override = basin_mat
+	parent.add_child(basin)
+	
+	# === DOCKS (concrete piers extending into basin) ===
+	# 3 piers running east-west into the basin
+	for pier_idx in range(3):
+		var pier_z = -100 + pier_idx * 100  # piers at z = -100, 0, 100
+		var pier = MeshInstance3D.new()
+		var p_mesh = BoxMesh.new()
+		p_mesh.size = Vector3(120, 1.0, 20)  # 120m long, 20m wide pier
+		pier.mesh = p_mesh
+		pier.position = Vector3(500, 0.5, pier_z)  # at water level
+		var pier_mat = StandardMaterial3D.new()
+		pier_mat.albedo_color = Color(0.5, 0.5, 0.5)  # concrete gray
+		pier_mat.roughness = 0.95
+		pier.material_override = pier_mat
+		parent.add_child(pier)
+		# Collision for pier (so cars can drive on it)
+		var pier_body = StaticBody3D.new()
+		pier_body.position = Vector3(500, 0.5, pier_z)
+		var pier_col = CollisionShape3D.new()
+		var pier_shape = BoxShape3D.new()
+		pier_shape.size = Vector3(120, 1.0, 20)
+		pier_col.shape = pier_shape
+		pier_body.add_child(pier_col)
+		parent.add_child(pier_body)
+	
+	# === CARGO SHIPS (large box-shaped ships docked at piers) ===
+	for ship_idx in range(3):
+		var ship_z = -100 + ship_idx * 100
+		var ship = MeshInstance3D.new()
+		var s_mesh = BoxMesh.new()
+		s_mesh.size = Vector3(80, 8, 15)  # 80m long, 8m tall, 15m wide ship
+		ship.mesh = s_mesh
+		ship.position = Vector3(540, 4, ship_z + 15)  # next to pier, half in water
+		var ship_mat = StandardMaterial3D.new()
+		var ship_colors = ["#1e3a5f", "#1e293b", "#0c4a6e", "#1e3a5f"]
+		ship_mat.albedo_color = Color.from_string(ship_colors[ship_idx % 4], Color.NAVY)
+		ship_mat.roughness = 0.4
+		ship_mat.metalness = 0.5
+		ship.material_override = ship_mat
+		parent.add_child(ship)
+		# Ship superstructure (bridge tower)
+		var bridge = MeshInstance3D.new()
+		var br_mesh = BoxMesh.new()
+		br_mesh.size = Vector3(15, 6, 12)
+		bridge.mesh = br_mesh
+		bridge.position = Vector3(540, 12, ship_z + 15)  # on top of ship
+		var bridge_mat = StandardMaterial3D.new()
+		bridge_mat.albedo_color = Color.WHITE
+		bridge_mat.roughness = 0.3
+		bridge.material_override = bridge_mat
+		parent.add_child(bridge)
+	
+	# === CARGO CONTAINERS (stacked on piers, not floating) ===
+	for i in range(60):
+		# Place containers ON the piers (at pier height y=1.5)
+		var pier_idx = i % 3
+		var pier_z = -100 + pier_idx * 100
+		var cx = 460 + (i / 3) % 5 * 12  # along pier length
+		var cz = pier_z + ((i / 3) / 5) % 2 * 6 - 3  # across pier width
 		var container = MeshInstance3D.new()
 		var c_mesh = BoxMesh.new()
-		var rot = randf() > 0.5
-		if rot:
-			c_mesh.size = Vector3(12, 2.5, 2.5)
-		else:
-			c_mesh.size = Vector3(2.5, 2.5, 12)
+		c_mesh.size = Vector3(12, 2.5, 2.5)  # standard container size
 		container.mesh = c_mesh
-		var stack_h = int(randf() * 3) * 2.6
-		container.position = Vector3(x, 1.3 + stack_h, z)
+		var stack_h = int(randf() * 3) * 2.6  # stack 0-2 high
+		container.position = Vector3(cx, 1.5 + stack_h, cz)
 		var mat = StandardMaterial3D.new()
-		var colors = ["#dc2626", "#2563eb", "#16a34a", "#eab308", "#ea580c", "#7c3aed"]
+		var colors = ["#dc2626", "#2563eb", "#16a34a", "#eab308", "#ea580c", "#7c3aed", "#0891b2"]
 		mat.albedo_color = Color.from_string(colors[randi() % colors.size()], Color.GRAY)
 		mat.roughness = 0.7
 		container.material_override = mat
 		parent.add_child(container)
-	# Cargo cranes (visual landmarks at harbor)
-	for i in range(4):
-		var cx = 230 + i * 30
-		var cz = -100 + (i % 2) * 200
+	
+	# === CARGO CRANES (large, on piers, loading ships) ===
+	for i in range(6):
+		var crane_idx = i % 3
+		var crane_z = -100 + crane_idx * 100
+		var crane_x = 480 + (i / 3) * 30
 		var crane = _make_crane()
-		crane.position = Vector3(cx, 0, cz)
+		crane.position = Vector3(crane_x, 1.0, crane_z)  # on pier
 		parent.add_child(crane)
 
 static func _make_crane() -> Node3D:

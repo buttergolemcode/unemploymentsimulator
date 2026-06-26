@@ -65,9 +65,9 @@ func _spawn_vehicles():
 		# Collision
 		var col = CollisionShape3D.new()
 		var shape = BoxShape3D.new()
-		shape.size = Vector3(1.9, 1.5, 4.2)  # matches new car body size
+		shape.size = Vector3(2.0, 1.5, 4.5)  # matches new larger car body
 		col.shape = shape
-		col.position = Vector3(0, 0.85, 0)  # center of 1.5m tall body
+		col.position = Vector3(0, 0.9, 0)  # center of body
 		vehicle.add_child(col)
 		
 		# Mesh container
