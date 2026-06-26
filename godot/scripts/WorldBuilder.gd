@@ -933,7 +933,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		var s_mesh = BoxMesh.new()
 		s_mesh.size = Vector3(80, 8, 15)  # 80m long, 8m tall, 15m wide ship
 		ship.mesh = s_mesh
-		ship.position = Vector3(1390, 4, ship_z + 15), half in water
+		ship.position = Vector3(1390, 4, ship_z + 15)  # next to pier at new harbor
 		var ship_mat = StandardMaterial3D.new()
 		var ship_colors = ["#1e3a5f", "#1e293b", "#0c4a6e", "#1e3a5f"]
 		ship_mat.albedo_color = Color.from_string(ship_colors[ship_idx % 4], Color(0.12, 0.23, 0.54))
