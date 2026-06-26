@@ -83,22 +83,11 @@ func _find_wheels(root):
 	_front_wheels_raw.clear()
 	_rear_wheels.clear()
 	_collect_wheels(root)
-	# Wrap each front wheel in a pivot Node3D so we can rotate it on Y
-	# without disturbing the wheel mesh's local orientation (which would
-	# cause the wheel to show its tire-side instead of the rim/Felge).
-	for wheel in _front_wheels_raw:
-		var pivot = Node3D.new()
-		pivot.name = "SteerPivot_" + wheel.name
-		var parent_node = wheel.get_parent()
-		var wheel_pos = wheel.position
-		var wheel_rot = wheel.rotation
-		parent_node.remove_child(wheel)
-		pivot.position = wheel_pos
-		parent_node.add_child(pivot)
-		wheel.position = Vector3.ZERO
-		wheel.rotation = wheel_rot  # preserve original orientation
-		pivot.add_child(wheel)
-		_front_wheel_pivots.append(pivot)
+	# NOTE: FBX wheel pivot wrapping DISABLED — was causing wheels to swing
+	# in an arc when steering (FBX mesh offset != wheel node origin).
+	# Steering animation only works for box-mesh fallback (pivots created
+	# in _build_box_mesh). FBX models: wheels don't turn visually when steering.
+	# Will be fixed properly in Sprint D.5 (Animations) with real rigging.
 
 func _collect_wheels(node):
 	var name_lower = node.name.to_lower()
