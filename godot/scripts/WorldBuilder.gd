@@ -131,7 +131,7 @@ static func get_district_at(x: float, z: float) -> String:
 
 static func terrain_height(x: float, z: float) -> float:
 	var r = sqrt(x * x + z * z)
-	# City area: completely flat (extended for larger map)
+	# City area: EXACTLY flat (no noise — prevents z-fighting with asphalt/sidewalk)
 	if r < 580:
 		return 0.0
 	# Rural edge: gentle hills rising toward mountains (extended range)
@@ -237,9 +237,13 @@ static func _build_terrain(parent: Node3D) -> void:
 	var mi = MeshInstance3D.new()
 	mi.mesh = final_mesh
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Lower terrain mesh by 0.05m to prevent z-fighting with asphalt (y=0.02)
+	# and sidewalk (y=0.075) layers above it.
+	mi.position.y = -0.05
 	var mat = StandardMaterial3D.new()
 	mat.vertex_color_use_as_albedo = true
 	mat.roughness = 0.95
+	# Disable depth write to prevent z-fighting with overlapping ground layers
 	mi.material_override = mat
 	
 	# === COLLISION SYSTEM (proper — covers all terrain) ===
@@ -360,11 +364,11 @@ static func _make_street(parent: Node3D, axis: String, pos: float) -> void:
 	var asphalt = MeshInstance3D.new()
 	var a_mesh = BoxMesh.new()
 	if axis == "x":
-		a_mesh.size = Vector3(length, 0.02, ROAD_HALF_WIDTH * 2)
-		asphalt.position = Vector3(0, 0.02, pos)
+		a_mesh.size = Vector3(length, 0.04, ROAD_HALF_WIDTH * 2)
+		asphalt.position = Vector3(0, 0.03, pos)  # raised to clear terrain (y=-0.05)
 	else:
-		a_mesh.size = Vector3(ROAD_HALF_WIDTH * 2, 0.02, length)
-		asphalt.position = Vector3(pos, 0.02, 0)
+		a_mesh.size = Vector3(ROAD_HALF_WIDTH * 2, 0.04, length)
+		asphalt.position = Vector3(pos, 0.03, 0)
 	asphalt.mesh = a_mesh
 	var amat = StandardMaterial3D.new()
 	amat.albedo_color = Color(0.08, 0.08, 0.08)  # dark asphalt
@@ -812,7 +816,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 	var b_mesh = BoxMesh.new()
 	b_mesh.size = Vector3(200, 0.1, 300)  # 200x300m harbor basin
 	basin.mesh = b_mesh
-	basin.position = Vector3(500, -2.5, 0)  # at water level, in harbor area
+	basin.position = Vector3(500, -2.0, 0)  # above water plane (y=-3.0) to avoid z-fight
 	var basin_mat = StandardMaterial3D.new()
 	basin_mat.albedo_color = Color(0.05, 0.15, 0.28)  # dark water
 	basin_mat.roughness = 0.1
@@ -959,9 +963,9 @@ static func _park(parent: Node3D, x: float, z: float, w: float, d: float) -> voi
 	# Grass surface (slightly raised like sidewalk)
 	var grass = MeshInstance3D.new()
 	var g_mesh = BoxMesh.new()
-	g_mesh.size = Vector3(w, 0.1, d)
+	g_mesh.size = Vector3(w, 0.12, d)
 	grass.mesh = g_mesh
-	grass.position = Vector3(x, 0.05, z)
+	grass.position = Vector3(x, 0.06, z)  # raised to clear terrain (y=-0.05)
 	var gmat = StandardMaterial3D.new()
 	gmat.albedo_color = Color(0.18, 0.35, 0.15)  # green grass
 	gmat.roughness = 1.0

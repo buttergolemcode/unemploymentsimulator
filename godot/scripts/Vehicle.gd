@@ -116,7 +116,7 @@ func _add_lights():
 	# Headlights
 	for x in [-0.75, 0.75]:
 		var hl = OmniLight3D.new()
-		hl.position = Vector3(x, 0.85, 2.25)  # at front of body
+		hl.position = Vector3(x, 1.0, 2.25)  # at front of body (raised)
 		hl.light_color = Color(1, 0.95, 0.8)
 		hl.light_energy = 1.5
 		hl.omni_range = 8.0
@@ -124,7 +124,7 @@ func _add_lights():
 	# Taillights
 	for x in [-0.75, 0.75]:
 		var tl = OmniLight3D.new()
-		tl.position = Vector3(x, 0.85, -2.25)  # at rear of body
+		tl.position = Vector3(x, 1.0, -2.25)  # at rear of body (raised)
 		tl.light_color = Color(1, 0.2, 0.1)
 		tl.light_energy = 0.8
 		tl.omni_range = 4.0
@@ -142,7 +142,7 @@ func _build_box_mesh():
 	var body_m = BoxMesh.new()
 	body_m.size = Vector3(2.0, 1.2, 4.5)  # 2m wide, 1.2m body, 4.5m long (slightly larger)
 	body.mesh = body_m
-	body.position = Vector3(0, 0.75, 0)  # body sits at 0.75m
+	body.position = Vector3(0, 0.95, 0)  # body sits at 0.95m (above wheels at 0.55+0.4=0.95)
 	body.material_override = mat
 	mesh.add_child(body)
 
@@ -151,7 +151,7 @@ func _build_box_mesh():
 	var cabin_m = BoxMesh.new()
 	cabin_m.size = Vector3(1.7, 0.8, 2.0)  # cabin: 1.7m wide, 0.8m tall, 2.0m long
 	cabin.mesh = cabin_m
-	cabin.position = Vector3(0, 1.7, -0.2)  # sits on top of body
+	cabin.position = Vector3(0, 1.95, -0.2)  # sits on top of body (body top at 1.55)
 	cabin.material_override = mat
 	mesh.add_child(cabin)
 
@@ -160,7 +160,7 @@ func _build_box_mesh():
 	var wind_m = BoxMesh.new()
 	wind_m.size = Vector3(1.6, 0.7, 0.1)
 	wind.mesh = wind_m
-	wind.position = Vector3(0, 1.7, 0.95)  # at cabin height
+	wind.position = Vector3(0, 1.95, 0.95)  # at cabin height
 	var glass_mat = StandardMaterial3D.new()
 	glass_mat.albedo_color = Color(0.06, 0.09, 0.16, 0.8)
 	glass_mat.roughness = 0.1
@@ -171,7 +171,9 @@ func _build_box_mesh():
 
 	# Wheels (also tracked for wheel-spin)
 	_wheel_nodes.clear()
-	for pos in [Vector3(-0.95, 0.4, 1.5), Vector3(0.95, 0.4, 1.5), Vector3(-0.95, 0.4, -1.5), Vector3(0.95, 0.4, -1.5)]:
+	# Wheel y-position must match collision box bottom (y=0.15).
+	# Wheel radius=0.4, so wheel center at y=0.55 -> bottom at y=0.15.
+	for pos in [Vector3(-0.95, 0.55, 1.5), Vector3(0.95, 0.55, 1.5), Vector3(-0.95, 0.55, -1.5), Vector3(0.95, 0.55, -1.5)]:
 		var wheel = MeshInstance3D.new()
 		var w_m = CylinderMesh.new()
 		w_m.top_radius = 0.4  # 40cm radius = 80cm diameter (realistic SUV)
