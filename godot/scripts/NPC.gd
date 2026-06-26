@@ -169,7 +169,7 @@ func _physics_process(delta):
 # Streets are at positions [-300, -200, -100, 0, 100, 200, 300] in both axes
 # with ROAD_HALF_WIDTH (4m) buffer. NPCs should stay on sidewalks (outside this buffer).
 static var STREET_POSITIONS: Array = [-300, -200, -100, 0, 100, 200, 300]
-static var ROAD_HALF: float = 4.5  # 4m half-width + 0.5m buffer
+static var ROAD_HALF: float = 5.5  # 4m half-width + 1.5m buffer (keep NPCs on sidewalk)
 
 static func _is_on_street(x: float, z: float) -> bool:
 	# Check if position is on a street (within road half-width of any street line)
@@ -184,7 +184,7 @@ static func _is_on_street(x: float, z: float) -> bool:
 
 func _pick_new_target():
 	# Try to find a target that's NOT on a street (keep NPC on sidewalks/buildings)
-	for attempt in range(10):
+	for attempt in range(20):
 		var angle = randf() * TAU
 		var dist = 8 + randf() * 20  # shorter range, stay near current block
 		var candidate = global_position + Vector3(cos(angle) * dist, 0, sin(angle) * dist)

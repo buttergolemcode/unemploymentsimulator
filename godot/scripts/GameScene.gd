@@ -65,9 +65,9 @@ func _spawn_vehicles():
 		# Collision
 		var col = CollisionShape3D.new()
 		var shape = BoxShape3D.new()
-		shape.size = Vector3(2.0, 1.5, 4.5)  # matches new larger car body
+		shape.size = Vector3(2.0, 1.4, 4.5)  # slightly shorter to lower center of mass
 		col.shape = shape
-		col.position = Vector3(0, 0.9, 0)  # center of body
+		col.position = Vector3(0, 0.7, 0)  # lowered: bottom at y=0.0 (ground level)
 		vehicle.add_child(col)
 		
 		# Mesh container
@@ -97,14 +97,14 @@ func _spawn_npcs():
 	for mp in merchant_positions:
 		_spawn_npc(mp.x, mp.z, mp.color, mp.district, true)
 	
-	# Pedestrians — distributed per district based on new layout
+	# Pedestrians — distributed per district (3x more NPCs for livelier city)
 	var ped_configs = [
-		{"district": "downtown", "count": 12, "colors": ["#1e293b", "#0f172a", "#374151", "#4b5563"]},
-		{"district": "harbor", "count": 5, "colors": ["#1c1917", "#292524", "#44403c"]},
-		{"district": "slums", "count": 10, "colors": ["#7c2d12", "#9a3412", "#451a03", "#1c1917"]},
-		{"district": "industrial", "count": 6, "colors": ["#3f3f46", "#525252", "#27272a"]},
-		{"district": "suburbs", "count": 5, "colors": ["#525252", "#737373", "#404040"]},
-		{"district": "rural", "count": 3, "colors": ["#6b5b4a", "#7a6a5a"]},
+		{"district": "downtown", "count": 35, "colors": ["#1e293b", "#0f172a", "#374151", "#4b5563"]},
+		{"district": "harbor", "count": 15, "colors": ["#1c1917", "#292524", "#44403c"]},
+		{"district": "slums", "count": 30, "colors": ["#7c2d12", "#9a3412", "#451a03", "#1c1917"]},
+		{"district": "industrial", "count": 18, "colors": ["#3f3f46", "#525252", "#27272a"]},
+		{"district": "suburbs", "count": 15, "colors": ["#525252", "#737373", "#404040"]},
+		{"district": "rural", "count": 8, "colors": ["#6b5b4a", "#7a6a5a"]},
 	]
 	for config in ped_configs:
 		for i in config.count:

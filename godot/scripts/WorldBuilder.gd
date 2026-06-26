@@ -453,35 +453,53 @@ static func _make_dash(parent: Node3D, axis: String, pos: float, t: float) -> vo
 	parent.add_child(dash)
 
 static func _build_crosswalks(parent: Node3D) -> void:
-	# At each intersection (cross of two streets), draw 4 crosswalks
-	# (zebra stripes) across each street leg
+	# At each intersection, add: 4 crosswalks + 4 corner sidewalk pieces
 	for x_pos in STREET_GRID:
 		for z_pos in STREET_GRID:
-			# Intersection at (x_pos, z_pos)
-			# 4 crosswalks: north, south, east, west legs
-			# Each crosswalk spans ROAD_HALF_WIDTH*2 wide and ~3m deep
-			_make_crosswalk(parent, x_pos, z_pos - ROAD_HALF_WIDTH - 1.5, "x")  # north leg
-			_make_crosswalk(parent, x_pos, z_pos + ROAD_HALF_WIDTH + 1.5, "x")  # south leg
-			_make_crosswalk(parent, x_pos - ROAD_HALF_WIDTH - 1.5, z_pos, "z")  # west leg
-			_make_crosswalk(parent, x_pos + ROAD_HALF_WIDTH + 1.5, z_pos, "z")  # east leg
+			# 4 crosswalks (zebra stripes) — one per street leg
+			_make_crosswalk(parent, x_pos, z_pos - ROAD_HALF_WIDTH - 1.5, "x")  # north
+			_make_crosswalk(parent, x_pos, z_pos + ROAD_HALF_WIDTH + 1.5, "x")  # south
+			_make_crosswalk(parent, x_pos - ROAD_HALF_WIDTH - 1.5, z_pos, "z")  # west
+			_make_crosswalk(parent, x_pos + ROAD_HALF_WIDTH + 1.5, z_pos, "z")  # east
+			# 4 corner sidewalk pieces (fill the gaps at intersection corners)
+			for cx_sign in [-1, 1]:
+				for cz_sign in [-1, 1]:
+					var corner_x = x_pos + cx_sign * (ROAD_HALF_WIDTH + SIDEWALK_WIDTH / 2)
+					var corner_z = z_pos + cz_sign * (ROAD_HALF_WIDTH + SIDEWALK_WIDTH / 2)
+					_make_sidewalk_corner(parent, corner_x, corner_z)
+
+static func _make_sidewalk_corner(parent: Node3D, x: float, z: float) -> void:
+	# Square sidewalk piece at intersection corner (fills gap between
+	# the two perpendicular sidewalks that were broken at intersection)
+	var corner = MeshInstance3D.new()
+	var c_mesh = BoxMesh.new()
+	c_mesh.size = Vector3(SIDEWALK_WIDTH, SIDEWALK_HEIGHT, SIDEWALK_WIDTH)
+	corner.mesh = c_mesh
+	corner.position = Vector3(x, SIDEWALK_HEIGHT / 2, z)
+	var smat = StandardMaterial3D.new()
+	smat.albedo_color = Color(0.55, 0.55, 0.55)  # match sidewalk color
+	smat.roughness = 0.9
+	corner.material_override = smat
+	parent.add_child(corner)
 
 static func _make_crosswalk(parent: Node3D, x: float, z: float, axis: String) -> void:
-	# Zebra stripes: white bars across the street
-	var stripe_width = 0.5
-	var stripe_count = 8
-	var stripe_spacing = (ROAD_HALF_WIDTH * 2) / stripe_count
+	# Zebra stripes: white bars across the FULL width of the street
+	var stripe_width = 0.6  # wider stripes (more visible)
+	var stripe_count = 6    # fewer stripes, more spacing
+	var stripe_length = ROAD_HALF_WIDTH * 2 - 0.5  # spans almost full street width
+	var stripe_spacing = 0.8  # space between stripes along crosswalk direction
 	for i in range(stripe_count):
 		var offset = (i - (stripe_count - 1) / 2.0) * stripe_spacing
 		var stripe = MeshInstance3D.new()
 		var s_mesh = BoxMesh.new()
 		if axis == "x":
-			# Crosswalk runs east-west, stripes are perpendicular (along z)
-			s_mesh.size = Vector3(stripe_width, 0.01, 3)
-			stripe.position = Vector3(x + offset, 0.04, z)
+			# Crosswalk runs east-west (along x), stripes perpendicular (along z)
+			s_mesh.size = Vector3(stripe_width, 0.02, stripe_length)
+			stripe.position = Vector3(x + offset, 0.05, z)
 		else:
-			# Crosswalk runs north-south, stripes are perpendicular (along x)
-			s_mesh.size = Vector3(3, 0.01, stripe_width)
-			stripe.position = Vector3(x, 0.04, z + offset)
+			# Crosswalk runs north-south (along z), stripes perpendicular (along x)
+			s_mesh.size = Vector3(stripe_length, 0.02, stripe_width)
+			stripe.position = Vector3(x, 0.05, z + offset)
 		stripe.mesh = s_mesh
 		var smat = StandardMaterial3D.new()
 		smat.albedo_color = Color(0.95, 0.95, 0.95)  # white
