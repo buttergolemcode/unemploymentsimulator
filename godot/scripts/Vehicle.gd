@@ -20,7 +20,8 @@ var is_driven: bool = false
 # Wheel nodes (found after model load) for wheel-spin animation
 var _wheel_nodes: Array = []
 # Front wheels (separate from rear) — these also turn left/right when steering
-var _front_wheels: Array = []
+var _front_wheel_pivots: Array = []  # parent Node3Ds for steering Y-rotation
+var _front_wheels_raw: Array = []  # raw wheel nodes before pivot wrapping
 var _rear_wheels: Array = []
 # Last steering input for body-roll animation
 var _last_steer: float = 0.0
@@ -74,16 +75,29 @@ func _instantiate_model(packed_scene):
 	_add_lights()
 
 func _find_wheels(root):
-	# Quaternius cars typically name wheel nodes "Wheel_FL", "Wheel_FR", "Wheel_RL", "Wheel_RR"
-	# or similar. Walk the tree and collect any node whose name contains "wheel".
+	# Quaternius cars name wheel nodes like "NormalCar1_FrontLeftWheel",
+	# "NormalCar1_FrontRightWheel", "NormalCar1_BackWheels".
 	_wheel_nodes.clear()
-	_front_wheels.clear()
+	_front_wheel_pivots.clear()
+	_front_wheels_raw.clear()
 	_rear_wheels.clear()
 	_collect_wheels(root)
-	# Fallback: if naming convention didn't match, assume first 2 wheels are front
-	if _front_wheels.is_empty() and _wheel_nodes.size() >= 4:
-		_front_wheels = [_wheel_nodes[0], _wheel_nodes[1]]
-		_rear_wheels = [_wheel_nodes[2], _wheel_nodes[3]]
+	# Wrap each front wheel in a pivot Node3D so we can rotate it on Y
+	# without disturbing the wheel mesh's local orientation (which would
+	# cause the wheel to show its tire-side instead of the rim/Felge).
+	for wheel in _front_wheels_raw:
+		var pivot = Node3D.new()
+		pivot.name = "SteerPivot_" + wheel.name
+		var parent_node = wheel.get_parent()
+		var wheel_pos = wheel.position
+		var wheel_rot = wheel.rotation
+		parent_node.remove_child(wheel)
+		pivot.position = wheel_pos
+		parent_node.add_child(pivot)
+		wheel.position = Vector3.ZERO
+		wheel.rotation = wheel_rot  # preserve original orientation
+		pivot.add_child(wheel)
+		_front_wheel_pivots.append(pivot)
 
 func _collect_wheels(node):
 	var name_lower = node.name.to_lower()
@@ -91,9 +105,9 @@ func _collect_wheels(node):
 		_wheel_nodes.append(node)
 		# Identify front wheels by 'f' or 'front' in name, plus 'l'/'r' for side
 		# Quaternius convention: Wheel_FL, Wheel_FR, Wheel_RL, Wheel_RR
-		if "_f" in name_lower or "front" in name_lower:
-			_front_wheels.append(node)
-		elif "_r" in name_lower or "rear" in name_lower or "_b" in name_lower:
+		if "front" in name_lower or "_fl" in name_lower or "_fr" in name_lower:
+			_front_wheels_raw.append(node)
+		elif "back" in name_lower or "rear" in name_lower or "_rl" in name_lower or "_rr" in name_lower:
 			_rear_wheels.append(node)
 	for child in node.get_children():
 		_collect_wheels(child)
@@ -174,9 +188,23 @@ func _build_box_mesh():
 		_wheel_nodes.append(wheel)
 	# In box-mesh fallback: order is [FL, FR, RL, RR] (z=+1.5 is front in local space
 	# because CarMesh is rotated 180° via rotation.y = yaw + PI)
-	_front_wheels = [_wheel_nodes[0], _wheel_nodes[1]]
+	# Wrap first two wheels (front) in pivots for steering animation
+	for i in [0, 1]:
+		var wheel_node = _wheel_nodes[i]
+		var pivot = Node3D.new()
+		pivot.name = "BoxSteerPivot_" + str(i)
+		var parent_node = wheel_node.get_parent()
+		var wp = wheel_node.position
+		var wr = wheel_node.rotation
+		parent_node.remove_child(wheel_node)
+		pivot.position = wp
+		parent_node.add_child(pivot)
+		wheel_node.position = Vector3.ZERO
+		wheel_node.rotation = wr
+		pivot.add_child(wheel_node)
+		_front_wheel_pivots.append(pivot)
 	_rear_wheels = [_wheel_nodes[2], _wheel_nodes[3]]
-	_use_box_mesh = true  # enable wheel animation in _animate_wheels_and_body
+	_use_box_mesh = true  # enable wheel spin animation
 
 	_add_lights()
 
@@ -300,9 +328,8 @@ func _animate_wheels_and_body(delta: float, current_steer: float):
 	else:
 		steer_visual_factor = clamp(1.0 - (abs_speed - 5.0) / 17.0, 0.3, 1.0)
 	var target_steer_angle = current_steer * 0.5 * steer_visual_factor
-	for wheel in _front_wheels:
-		# Only set Y rotation, preserve X and Z (which keep wheel upright)
-		wheel.rotation.y = lerp(wheel.rotation.y, target_steer_angle, delta * 8.0)
+	for pivot in _front_wheel_pivots:
+		pivot.rotation.y = lerp(pivot.rotation.y, target_steer_angle, delta * 8.0)
 	
 	# Wheel spin (X-axis rotation): ONLY for box-mesh fallback.
 	# For real FBX models, rotate_x() would accumulate on top of baked

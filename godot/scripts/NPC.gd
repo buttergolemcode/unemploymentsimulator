@@ -44,10 +44,9 @@ func _build_mesh():
 		# Quaternius characters are roughly 1.8m tall, scale to match our collision
 		instance.scale = Vector3(1.0, 1.0, 1.0)
 		# Rotate to face forward (FBX may have different default orientation)
-		# Quaternius characters face -Z by default (forward in Godot).
-		# Our NPC movement uses facing = atan2(dx, dz) which assumes +Z forward.
-		# So we rotate the model by PI to align mesh with movement direction.
-		instance.rotation.y = PI
+		# Quaternius characters face -Z by default (Godot's forward direction).
+		# Our NPC movement uses facing = atan2(dx, dz), where facing=0 means
+		# moving toward -Z. So no rotation needed — model already faces -Z.
 		mesh.add_child(instance)
 		# Add merchant badge if applicable
 		if is_merchant:
@@ -157,7 +156,11 @@ func _physics_process(delta):
 		_pick_new_target()
 	else:
 		velocity = Vector3(dx / dist * speed, 0, dz / dist * speed)
-		facing = atan2(dx, dz)
+		# Godot Y-rotation convention: forward = (-sin(yaw), 0, -cos(yaw))
+		# We want forward to equal movement direction (dx, dz), so:
+		# -sin(yaw) = dx/dist, -cos(yaw) = dz/dist
+		# yaw = atan2(-dx, -dz)
+		facing = atan2(-dx, -dz)
 		rotation.y = facing
 		walk_phase += delta * 8
 		# Walk bob animation (procedural — will be replaced with real anim later)
