@@ -453,6 +453,45 @@ static func _make_sidewalk_segment(parent: Node3D, axis: String, pos: float,
 	col.shape = shape
 	body.add_child(col)
 	parent.add_child(body)
+	
+	# RAMP COLLISION: Sloped edge on street-facing side of sidewalk
+	# Allows cars to drive UP onto sidewalk instead of hitting a wall.
+	# Ramp goes from y=0 (street) to y=SIDEWALK_HEIGHT over 30cm depth.
+	var ramp_depth = 0.3
+	var ramp_body = StaticBody3D.new()
+	var ramp_col = CollisionShape3D.new()
+	var ramp_shape = ConvexPolygonShape3D.new()
+	# Street-facing direction: -side points toward street
+	# For side=-1 (sidewalk south of street): street is at +z, so street_z = +ramp_depth/2
+	# For side=+1 (sidewalk north of street): street is at -z, so street_z = -ramp_depth/2
+	var street_offset = -side * (ramp_depth / 2)   # y=0 side (toward street)
+	var sidewalk_offset = side * (ramp_depth / 2)   # y=SIDEWALK_HEIGHT side (toward sidewalk)
+	if axis == "x":
+		# Ramp runs along x-axis, slopes in z direction
+		# Position ramp at the street-facing edge of sidewalk
+		ramp_body.position = Vector3(sx, 0, sz + (-side * SIDEWALK_WIDTH / 2))
+		ramp_shape.points = PackedVector3Array([
+			Vector3(-seg_len / 2, 0, street_offset),       # street bottom left
+			Vector3(seg_len / 2, 0, street_offset),         # street bottom right
+			Vector3(-seg_len / 2, 0, sidewalk_offset),      # under-ramp bottom left
+			Vector3(seg_len / 2, 0, sidewalk_offset),       # under-ramp bottom right
+			Vector3(-seg_len / 2, SIDEWALK_HEIGHT, sidewalk_offset),  # sidewalk top left
+			Vector3(seg_len / 2, SIDEWALK_HEIGHT, sidewalk_offset),   # sidewalk top right
+		])
+	else:
+		# Ramp runs along z-axis, slopes in x direction
+		ramp_body.position = Vector3(sx + (-side * SIDEWALK_WIDTH / 2), 0, sz)
+		ramp_shape.points = PackedVector3Array([
+			Vector3(street_offset, 0, -seg_len / 2),       # street bottom front
+			Vector3(street_offset, 0, seg_len / 2),         # street bottom back
+			Vector3(sidewalk_offset, 0, -seg_len / 2),      # under-ramp bottom front
+			Vector3(sidewalk_offset, 0, seg_len / 2),       # under-ramp bottom back
+			Vector3(sidewalk_offset, SIDEWALK_HEIGHT, -seg_len / 2),  # sidewalk top front
+			Vector3(sidewalk_offset, SIDEWALK_HEIGHT, seg_len / 2),   # sidewalk top back
+		])
+	ramp_col.shape = ramp_shape
+	ramp_body.add_child(ramp_col)
+	parent.add_child(ramp_body)
 
 static func _make_dash(parent: Node3D, axis: String, pos: float, t: float) -> void:
 	var dash = MeshInstance3D.new()
