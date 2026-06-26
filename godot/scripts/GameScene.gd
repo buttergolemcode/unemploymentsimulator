@@ -65,9 +65,9 @@ func _spawn_vehicles():
 		# Collision
 		var col = CollisionShape3D.new()
 		var shape = BoxShape3D.new()
-		shape.size = Vector3(2, 1.5, 4.4)
+		shape.size = Vector3(1.9, 1.5, 4.2)  # matches new car body size
 		col.shape = shape
-		col.position = Vector3(0, 0.75, 0)
+		col.position = Vector3(0, 0.85, 0)  # center of 1.5m tall body
 		vehicle.add_child(col)
 		
 		# Mesh container
@@ -125,10 +125,10 @@ func _spawn_npc(x: float, z: float, color: String, district: String, is_merchant
 	
 	var col = CollisionShape3D.new()
 	var shape = CapsuleShape3D.new()
-	shape.radius = 0.3
-	shape.height = 1.5
+	shape.radius = 0.35  # 35cm radius — realistic human shoulder width
+	shape.height = 1.7  # 1.7m tall capsule (covers head to feet)
 	col.shape = shape
-	col.position = Vector3(0, 0.75, 0)
+	col.position = Vector3(0, 0.85, 0)  # center at 0.85m
 	npc.add_child(col)
 	
 	var mesh_node = Node3D.new()

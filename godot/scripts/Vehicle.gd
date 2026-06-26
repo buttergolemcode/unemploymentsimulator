@@ -114,17 +114,17 @@ func _collect_wheels(node):
 
 func _add_lights():
 	# Headlights
-	for x in [-0.6, 0.6]:
+	for x in [-0.7, 0.7]:
 		var hl = OmniLight3D.new()
-		hl.position = Vector3(x, 0.5, 2.2)
+		hl.position = Vector3(x, 0.7, 2.1)  # at front of body
 		hl.light_color = Color(1, 0.95, 0.8)
 		hl.light_energy = 1.5
 		hl.omni_range = 8.0
 		mesh.add_child(hl)
 	# Taillights
-	for x in [-0.6, 0.6]:
+	for x in [-0.7, 0.7]:
 		var tl = OmniLight3D.new()
-		tl.position = Vector3(x, 0.5, -2.2)
+		tl.position = Vector3(x, 0.7, -2.1)  # at rear of body
 		tl.light_color = Color(1, 0.2, 0.1)
 		tl.light_energy = 0.8
 		tl.omni_range = 4.0
@@ -140,27 +140,27 @@ func _build_box_mesh():
 	# Body
 	var body = MeshInstance3D.new()
 	var body_m = BoxMesh.new()
-	body_m.size = Vector3(2, 0.7, 4.4)
+	body_m.size = Vector3(1.9, 1.0, 4.2)  # realistic car: 1.9m wide, 1.0m body height, 4.2m long
 	body.mesh = body_m
-	body.position = Vector3(0, 0.35, 0)
+	body.position = Vector3(0, 0.65, 0)  # body sits at 0.65m (wheel top)
 	body.material_override = mat
 	mesh.add_child(body)
 
 	# Cabin
 	var cabin = MeshInstance3D.new()
 	var cabin_m = BoxMesh.new()
-	cabin_m.size = Vector3(1.7, 0.6, 2.0)
+	cabin_m.size = Vector3(1.6, 0.7, 1.8)  # cabin: 1.6m wide, 0.7m tall, 1.8m long
 	cabin.mesh = cabin_m
-	cabin.position = Vector3(0, 1.0, -0.2)
+	cabin.position = Vector3(0, 1.5, -0.2)  # sits on top of body
 	cabin.material_override = mat
 	mesh.add_child(cabin)
 
 	# Windshield
 	var wind = MeshInstance3D.new()
 	var wind_m = BoxMesh.new()
-	wind_m.size = Vector3(1.6, 0.5, 0.1)
+	wind_m.size = Vector3(1.5, 0.6, 0.1)
 	wind.mesh = wind_m
-	wind.position = Vector3(0, 1.0, 0.85)
+	wind.position = Vector3(0, 1.5, 0.85)  # at cabin height
 	var glass_mat = StandardMaterial3D.new()
 	glass_mat.albedo_color = Color(0.06, 0.09, 0.16, 0.8)
 	glass_mat.roughness = 0.1
@@ -171,12 +171,12 @@ func _build_box_mesh():
 
 	# Wheels (also tracked for wheel-spin)
 	_wheel_nodes.clear()
-	for pos in [Vector3(-0.9, 0.35, 1.5), Vector3(0.9, 0.35, 1.5), Vector3(-0.9, 0.35, -1.5), Vector3(0.9, 0.35, -1.5)]:
+	for pos in [Vector3(-0.9, 0.35, 1.4), Vector3(0.9, 0.35, 1.4), Vector3(-0.9, 0.35, -1.4), Vector3(0.9, 0.35, -1.4)]:
 		var wheel = MeshInstance3D.new()
 		var w_m = CylinderMesh.new()
-		w_m.top_radius = 0.35
+		w_m.top_radius = 0.35  # 35cm radius = 70cm diameter (realistic)
 		w_m.bottom_radius = 0.35
-		w_m.height = 0.25
+		w_m.height = 0.25  # 25cm tire width
 		wheel.mesh = w_m
 		wheel.rotation.z = PI / 2
 		wheel.position = pos

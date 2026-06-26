@@ -31,11 +31,11 @@ const WATER_PLANE_SIZE: float = 1600.0  # large enough to look infinite
 
 # Street grid (NYC-style 100m blocks)
 const STREET_GRID: Array = [-300, -200, -100, 0, 100, 200, 300]
-const ROAD_HALF_WIDTH: float = 8.0      # street is 16m wide (4 lanes)
-const SIDEWALK_WIDTH: float = 3.0       # 3m sidewalk on each side
-const SIDEWALK_HEIGHT: float = 0.15     # raised sidewalk
-const BLOCK_SIZE: float = 100.0         # distance between street centers
-const BUILDING_MARGIN: float = 1.0      # gap between building and sidewalk
+const ROAD_HALF_WIDTH: float = 4.0       # street is 8m wide (2 lanes of 4m)
+const SIDEWALK_WIDTH: float = 2.5       # 2.5m sidewalk on each side (realistic)
+const SIDEWALK_HEIGHT: float = 0.15     # raised sidewalk (15cm curb)
+const BLOCK_SIZE: float = 80.0          # 80m blocks (was 100m, more NYC-like)
+const BUILDING_MARGIN: float = 0.5      # buildings flush with sidewalk (NYC-style)
 
 # District definitions
 static var DISTRICTS: Dictionary = {}
@@ -45,31 +45,31 @@ static func _init_districts() -> void:
 		return
 	DISTRICTS = {
 		"downtown": {
-			"color": "#475569", "height_min": 30, "height_max": 100, "ground": "#1a1a1a",
+			"color": "#475569", "height_min": 40, "height_max": 150, "ground": "#1a1a1a",
 			"polygon": PackedVector2Array([
 				Vector2(-200, -150), Vector2(200, -150), Vector2(200, 200), Vector2(-200, 200)
 			])
 		},
 		"harbor": {
-			"color": "#1c1917", "height_min": 8, "height_max": 22, "ground": "#171717",
+			"color": "#1c1917", "height_min": 10, "height_max": 25, "ground": "#171717",
 			"polygon": PackedVector2Array([
 				Vector2(200, -300), Vector2(400, -300), Vector2(400, 300), Vector2(200, 300)
 			])
 		},
 		"slums": {
-			"color": "#451a03", "height_min": 5, "height_max": 14, "ground": "#1a0f0a",
+			"color": "#451a03", "height_min": 4, "height_max": 10, "ground": "#1a0f0a",
 			"polygon": PackedVector2Array([
 				Vector2(-400, 200), Vector2(-200, 200), Vector2(-200, 400), Vector2(-400, 400)
 			])
 		},
 		"industrial": {
-			"color": "#1f2937", "height_min": 9, "height_max": 24, "ground": "#161616",
+			"color": "#1f2937", "height_min": 10, "height_max": 30, "ground": "#161616",
 			"polygon": PackedVector2Array([
 				Vector2(-400, -400), Vector2(-200, -400), Vector2(-200, -150), Vector2(-400, -150)
 			])
 		},
 		"suburbs": {
-			"color": "#525252", "height_min": 4, "height_max": 9, "ground": "#1a2a1a",
+			"color": "#525252", "height_min": 5, "height_max": 10, "ground": "#1a2a1a",
 			"polygon": PackedVector2Array([
 				Vector2(-400, -150), Vector2(-200, -150), Vector2(-200, 200), Vector2(-400, 200)
 			])
@@ -85,25 +85,25 @@ static func _init_districts() -> void:
 # ============================================================
 
 const SCHEME_BUILDINGS: Array = [
-	# Downtown (center)
+	# Downtown (center) — tall skyscrapers (40-120m)
 	{"id": "trading", "name": "Trading Floor", "emoji": "📈",
-	 "x": -50, "z": -50, "w": 18, "d": 16, "h": 50, "color": "#22d3ee"},
+	 "x": -50, "z": -50, "w": 25, "d": 22, "h": 70, "color": "#22d3ee"},
 	{"id": "wirefraud", "name": "Corporate Tower", "emoji": "💸",
-	 "x": 50, "z": -50, "w": 22, "d": 20, "h": 90, "color": "#64748b"},
+	 "x": 50, "z": -50, "w": 30, "d": 25, "h": 120, "color": "#64748b"},
 	{"id": "taxfraud", "name": "Accountant Office", "emoji": "🧾",
-	 "x": -150, "z": 50, "w": 14, "d": 12, "h": 28, "color": "#eab308"},
+	 "x": -150, "z": 50, "w": 18, "d": 16, "h": 35, "color": "#eab308"},
 	{"id": "gambling", "name": "Casino", "emoji": "🎰",
-	 "x": 150, "z": 100, "w": 20, "d": 18, "h": 22, "color": "#f59e0b"},
-	# Slums (SW)
+	 "x": 150, "z": 100, "w": 25, "d": 22, "h": 28, "color": "#f59e0b"},
+	# Slums (SW) — small rundown houses (4-8m)
 	{"id": "drugs", "name": "Trap House", "emoji": "💊",
-	 "x": -350, "z": 250, "w": 12, "d": 10, "h": 10, "color": "#a855f7"},
+	 "x": -350, "z": 250, "w": 10, "d": 8, "h": 6, "color": "#a855f7"},
 	{"id": "scam", "name": "Internet Cafe", "emoji": "🎣",
-	 "x": -250, "z": 350, "w": 10, "d": 9, "h": 8, "color": "#ec4899"},
+	 "x": -250, "z": 350, "w": 8, "d": 7, "h": 5, "color": "#ec4899"},
 	{"id": "robbery", "name": "Corner Store", "emoji": "🔫",
-	 "x": -350, "z": 350, "w": 9, "d": 9, "h": 6, "color": "#ef4444"},
-	# Industrial (NW)
+	 "x": -350, "z": 350, "w": 7, "d": 7, "h": 4, "color": "#ef4444"},
+	# Industrial (NW) — large warehouse (15m)
 	{"id": "ecom", "name": "E-Com Warehouse", "emoji": "📦",
-	 "x": -350, "z": -250, "w": 20, "d": 18, "h": 14, "color": "#4ade80"},
+	 "x": -350, "z": -250, "w": 25, "d": 22, "h": 15, "color": "#4ade80"},
 ]
 
 # ============================================================
@@ -547,9 +547,9 @@ static func _build_block(parent: Node3D, bx: float, bz: float) -> void:
 	if dist_id == "water" or dist_id == "rural":
 		return  # no buildings in water/rural
 	
-	# Block bounds (100x100m block, with sidewalk + margin subtracted)
+	# Block bounds (BLOCK_SIZE wide, with sidewalk + margin subtracted)
 	var road_buffer = ROAD_HALF_WIDTH + SIDEWALK_WIDTH + BUILDING_MARGIN
-	var block_inner = BLOCK_SIZE - 2 * road_buffer  # ~84m
+	var block_inner = BLOCK_SIZE - 2 * road_buffer  # ~70m for 80m block
 	if block_inner < 10:
 		return
 	
@@ -869,18 +869,16 @@ static func _make_crane() -> Node3D:
 static func _build_landmarks(parent: Node3D) -> void:
 	# Central Park (large green area in downtown)
 	_park(parent, -50, 100, 80, 50)
-	# Skyline row (3 tall towers)
-	_skyscraper(parent, 150, -100, 12, 90, "#1e293b")
-	_skyscraper(parent, 175, -100, 12, 110, "#0f172a")
-	_skyscraper(parent, 200, -100, 12, 95, "#1e293b")
+	# Skyline row (3 tall towers, 100-150m)
+	_skyscraper(parent, 150, -100, 18, 110, "#1e293b")
+	_skyscraper(parent, 175, -100, 18, 140, "#0f172a")
+	_skyscraper(parent, 200, -100, 18, 120, "#1e293b")
 	# Bridge at harbor
 	_bridge(parent, 250, 0, 0)
 	# Fortress on west hill
 	_fortress(parent, -300, -300)
-	# Stadium
+	# Stadium (large, ~80m diameter)
 	_stadium(parent, -250, 100)
-	# Church tower
-	_church_tower(parent, 0, 0)
 	# Bus station
 	_bus_station(parent, 100, 150)
 	# Gas stations
