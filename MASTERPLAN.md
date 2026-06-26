@@ -137,46 +137,16 @@ Replace box-mesh vehicles with real Quaternius car models. Add wheel-spin, front
 #### D.3 — NPC model integration (Quaternius Modular Characters) ✅
 - Replaced capsule NPCs with 11 real character models (Adventurer, Beach, Casual, Casual2, Farmer, King, Punk, Spacesuit, Suit, Swat, Worker)
 - Player uses "Suit" character model in third-person view
-- Walk animation: procedural bob + forward lean (real animations pending)
+- Walk animation: procedural bob + forward lean (real animations pending in D.5)
 - Idle/knockdown states preserved
 - Fallback to capsule mesh if FBX missing
 - Source: Quaternius Ultimate Modular Characters Pack (CC0, FBX format)
 
-#### D.4 — Building system overhaul (Kenney City Kit)
-- Build a **MeshLibrary** from Kenney modular building parts
-- Create a `BuildingGenerator.gd` that assembles buildings from modular parts:
-  - Pick base tile (1×1, 2×2, 4×4 footprint)
-  - Stack N floors (per district height range)
-  - Add roof variation (flat, pitched, with AC units)
-- Replace `_build_scheme_buildings()` to use real buildings per scheme type:
-  - Trading Floor → tall commercial tower
-  - Trap House → small suburban house
-  - Casino → ornate downtown building
-  - etc.
-- Replace `_build_filler_buildings()` to use modular commercial/suburban/industrial parts
-- Districts have **distinct visual identity**:
-  - Downtown: tall commercial towers, glass facades
-  - Harbor: low industrial warehouses + cranes
-  - Slums: rundown suburban houses, boarded windows
-  - Industrial: factories, silos, pipes
-  - Suburbs: clean single-family homes, gardens
-  - Rural: farmhouses, barns, fields
+#### D.4 — Map layout redesign (logical city) ⬅️ NEXT
+Replace the current radial grid with a designed city plan. This comes FIRST
+because all subsequent steps (buildings, roads, props) need to fit into a
+defined layout — otherwise we'd be placing assets twice.
 
-#### D.5 — Road network redesign (Kenney Roads + Quaternius Streets)
-- Replace current grid-with-asphalt-planes with **modular road tiles**:
-  - Straight, curve, T-junction, 4-way intersection
-  - With/without sidewalk, with/without crosswalk
-- Build a real **road graph** (not just grid):
-  - Main avenues (4-lane, with center divider)
-  - Side streets (2-lane, residential)
-  - Alleyways (1-lane, slums)
-  - Highway loops around city
-- Add **traffic lights** at major intersections (visual only for now)
-- Add **road markings**: lane lines, crosswalks, stop lines
-- Snap road tiles to 10m grid for clean layout
-
-#### D.6 — Map layout redesign (logical city)
-Replace the current radial grid with a designed city plan:
 ```
                 NORTH (forests, hills)
                         |
@@ -190,10 +160,12 @@ Replace the current radial grid with a designed city plan:
                         |
                   SOUTH (highway, rural)
 ```
+
 - Water on east edge (harbor district with docks)
 - Highway rings the city (with exits to downtown)
 - Each district has clear borders (river, highway, or greenbelt)
 - Districts sized to actual gameplay needs (downtown large for trading, slums small for drug deals, etc.)
+- Define district polygons (Vector2 arrays) used by all later steps
 - 8 scheme buildings placed at thematic spots:
   - Trading Floor → downtown financial district
   - Corporate Tower (wirefraud) → downtown
@@ -203,8 +175,72 @@ Replace the current radial grid with a designed city plan:
   - Corner Store (robbery) → slums
   - E-Com Warehouse (ecom) → industrial
   - Casino (gambling) → downtown entertainment strip
+- Update `WorldBuilder.gd` to use new layout (district polygons + scheme positions)
+- Acceptance: City outline visible, districts color-coded on minimap (later), scheme buildings at correct thematic spots
 
-#### D.7 — Street props & polish (KayKit + Downtown MegaKit)
+#### D.5 — Animations (NPCs, vehicles, player) ⬅️ AFTER MAP LAYOUT
+Add real animations to replace current procedural hacks.
+
+**NPC animations:**
+- Get Quaternius Universal Animation Library (CC0) — currently blocked by itch.io purchase flow, user may need to download manually
+- Set up shared AnimationLibrary across all character models
+- Animations needed: idle, walk, run, talk, knocked-down, get-up
+- Replace procedural walk bob + forward lean with real walk animation
+- Add idle animation when NPC reaches target
+- Add 'scream'/fall animation on vehicle knockdown
+
+**Vehicle animations:**
+- Wheel spin (rotate_x) — currently disabled for FBX models because it conflicts with baked orientation
+- Solution: Reparent wheel meshes into spin-pivot Node3Ds (similar to steer-pivot approach)
+- Then: front wheels have BOTH a steer-pivot (Y) AND a spin-pivot (X) as parent chain
+- Spin rate based on vehicle speed (visual feedback)
+- Body roll/pitch already done — keep
+
+**Player animations:**
+- Walk, run, idle, enter-vehicle, exit-vehicle
+- Third-person view should show these animations
+- First-person: only arm/hand animations if any (optional)
+
+**Acceptance:**
+- NPCs visibly walk (legs moving) instead of just bobbing
+- Car wheels visibly spin when car is moving
+- Player has walk/run animation in third-person
+
+#### D.6 — Building system overhaul (Kenney City Kit)
+- Build a **MeshLibrary** from Kenney modular building parts
+- Create a `BuildingGenerator.gd` that assembles buildings from modular parts:
+  - Pick base tile (1×1, 2×2, 4×4 footprint)
+  - Stack N floors (per district height range)
+  - Add roof variation (flat, pitched, with AC units)
+- Replace `_build_scheme_buildings()` to use real buildings per scheme type:
+  - Trading Floor → tall commercial tower
+  - Trap House → small suburban house
+  - Casino → ornate downtown building
+  - etc.
+- Replace `_build_filler_buildings()` to use modular commercial/suburban/industrial parts
+- Buildings placed WITHIN the district polygons defined in D.4
+- Districts have **distinct visual identity**:
+  - Downtown: tall commercial towers, glass facades
+  - Harbor: low industrial warehouses + cranes
+  - Slums: rundown suburban houses, boarded windows
+  - Industrial: factories, silos, pipes
+  - Suburbs: clean single-family homes, gardens
+  - Rural: farmhouses, barns, fields
+
+#### D.7 — Road network redesign (Kenney Roads + Quaternius Streets)
+- Replace current grid-with-asphalt-planes with **modular road tiles**:
+  - Straight, curve, T-junction, 4-way intersection
+  - With/without sidewalk, with/without crosswalk
+- Build a real **road graph** (not just grid) within district polygons:
+  - Main avenues (4-lane, with center divider)
+  - Side streets (2-lane, residential)
+  - Alleyways (1-lane, slums)
+  - Highway loops around city
+- Add **traffic lights** at major intersections (visual only for now)
+- Add **road markings**: lane lines, crosswalks, stop lines
+- Snap road tiles to 10m grid for clean layout
+
+#### D.8 — Street props & polish (KayKit + Downtown MegaKit)
 - Distribute street props: lamps, benches, hydrants, trash cans, planters
 - Add storefront props (Quaternius Downtown MegaKit): awnings, signs, neon
 - Add parked cars along streets (using Quaternius Cars, non-drivable instances)
@@ -215,7 +251,7 @@ Replace the current radial grid with a designed city plan:
   - Downtown: planters, art installations, fancy lamps
 - Add **decals** for road damage, graffiti, oil stains
 
-#### D.8 — Lighting & atmosphere polish
+#### D.9 — Lighting & atmosphere polish
 - Per-district lighting setup:
   - Downtown: warm white street lamps, neon accent
   - Harbor: cold blue, foggy
@@ -228,26 +264,28 @@ Replace the current radial grid with a designed city plan:
 - Reflection probes at key intersections (for wet-street look)
 - Particle effects: dust in industrial, leaves in suburbs, mist in harbor
 
-#### D.9 — Water shader (harbor)
+#### D.10 — Water shader (harbor)
 - Animated water plane with vertex displacement (waves)
 - Reflection of sky + nearby buildings
 - Foam at shoreline
 - Distant fog over water for horizon blend
 
-#### D.10 — Sprint D acceptance test
+#### D.11 — Sprint D acceptance test
 - [ ] All 8 scheme buildings use real CC0 models
 - [ ] All vehicles use Quaternius car models (not boxes)
-- [ ] All NPCs use animated character models (not capsules)
-- [ ] Player has a real character model in third-person view
-- [ ] City has 6 visually distinct districts
+- [ ] All NPCs use animated character models with real walk animation
+- [ ] Player has a real character model with walk/run animations
+- [ ] City has 6 visually distinct districts arranged in logical layout
 - [ ] Road network is logically laid out (not random grid)
 - [ ] Street props distributed naturally
 - [ ] Per-district lighting makes each area feel different
+- [ ] Vehicle wheels visibly spin and steer
 - [ ] No placeholder boxes visible anywhere in the world
 - [ ] FPS stays above 60 on target hardware
 
 ### Sprint E — Sound & Atmosphere ⬅️ NEXT AFTER D
 Build the audio layer that turns the visual world into a "living" world.
+
 
 - **Background music**: Pixabay Lo-Fi (CC0) — district-specific playlists
 - **Ambient SFX**:
