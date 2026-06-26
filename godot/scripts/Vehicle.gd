@@ -19,6 +19,9 @@ var is_driven: bool = false
 
 # Wheel nodes (found after model load) for wheel-spin animation
 var _wheel_nodes: Array = []
+# Front wheels (separate from rear) — these also turn left/right when steering
+var _front_wheels: Array = []
+var _rear_wheels: Array = []
 # Last steering input for body-roll animation
 var _last_steer: float = 0.0
 
@@ -70,11 +73,24 @@ func _find_wheels(root):
 	# Quaternius cars typically name wheel nodes "Wheel_FL", "Wheel_FR", "Wheel_RL", "Wheel_RR"
 	# or similar. Walk the tree and collect any node whose name contains "wheel".
 	_wheel_nodes.clear()
+	_front_wheels.clear()
+	_rear_wheels.clear()
 	_collect_wheels(root)
+	# Fallback: if naming convention didn't match, assume first 2 wheels are front
+	if _front_wheels.is_empty() and _wheel_nodes.size() >= 4:
+		_front_wheels = [_wheel_nodes[0], _wheel_nodes[1]]
+		_rear_wheels = [_wheel_nodes[2], _wheel_nodes[3]]
 
 func _collect_wheels(node):
-	if "wheel" in node.name.to_lower():
+	var name_lower = node.name.to_lower()
+	if "wheel" in name_lower:
 		_wheel_nodes.append(node)
+		# Identify front wheels by 'f' or 'front' in name, plus 'l'/'r' for side
+		# Quaternius convention: Wheel_FL, Wheel_FR, Wheel_RL, Wheel_RR
+		if "_f" in name_lower or "front" in name_lower:
+			_front_wheels.append(node)
+		elif "_r" in name_lower or "rear" in name_lower or "_b" in name_lower:
+			_rear_wheels.append(node)
 	for child in node.get_children():
 		_collect_wheels(child)
 
@@ -152,6 +168,10 @@ func _build_box_mesh():
 		wheel.material_override = wmat
 		mesh.add_child(wheel)
 		_wheel_nodes.append(wheel)
+	# In box-mesh fallback: order is [FL, FR, RL, RR] (z=+1.5 is front in local space
+	# because CarMesh is rotated 180° via rotation.y = yaw + PI)
+	_front_wheels = [_wheel_nodes[0], _wheel_nodes[1]]
+	_rear_wheels = [_wheel_nodes[2], _wheel_nodes[3]]
 
 	_add_lights()
 
@@ -202,7 +222,6 @@ func _physics_process(delta):
 			speed = min(0, speed + decel)
 
 	# === Steering model ===
-	var abs_speed = abs(speed)
 	if abs_speed > min_turn_speed:
 		# Bell-curve steering authority (realistic):
 		# - Ramps UP from 0 at standstill to peak at ~5 m/s (city cornering)
@@ -264,11 +283,28 @@ func _animate_wheels_and_body(delta: float, current_steer: float):
 		# Use rotate_x for accumulated rotation (don't set rotation.x directly
 		# because the wheel may have a base rotation for orientation)
 		wheel.rotate_x(spin_rate * delta)
+	
+	# Front wheel steering: turn front wheels left/right based on steer input.
+	# Realistic max steering angle ~30 degrees at full lock (low speed),
+	# reduced at high speed for stability (matches steering authority bell curve).
+	var steer_visual_factor: float
+	if abs_speed < 1.0:
+		steer_visual_factor = 1.0  # full lock allowed at standstill for visual
+	elif abs_speed < 5.0:
+		steer_visual_factor = 1.0  # still full lock at low speed
+	else:
+		# Reduce visible steering angle at higher speeds
+		steer_visual_factor = clamp(1.0 - (abs_speed - 5.0) / 17.0, 0.3, 1.0)
+	# Target Y rotation: steer (left=-1, right=+1) * max_angle (in radians)
+	# 0.5 rad = ~28 degrees, matches real car full lock
+	var target_steer_angle = current_steer * 0.5 * steer_visual_factor
+	for wheel in _front_wheels:
+		# Smoothly interpolate to target steering angle (lerp for natural feel)
+		wheel.rotation.y = lerp(wheel.rotation.y, target_steer_angle, delta * 8.0)
 
 	# Body roll: lean into turns based on steer input and speed
 	# More speed + more steer = more roll. Cap at small angle for subtlety.
 	var target_roll = 0.0
-	var abs_speed = abs(speed)
 	if abs_speed > 1.0:
 		var speed_factor = clamp(abs_speed / max_speed, 0.0, 1.0)
 		# Lean OUTSIDE of the turn (positive steer = right turn = body rolls left = negative Z rotation)
