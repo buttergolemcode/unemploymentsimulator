@@ -65,12 +65,12 @@ func _spawn_vehicles():
 		# Collision
 		var col = CollisionShape3D.new()
 		var shape = BoxShape3D.new()
-		# Vehicle collision box — bottom at y=0 (ground level)
-		# Sidewalks/park now have their own collision, so car will naturally
-		# drive onto them via floor_snap. No fake ground clearance needed.
+		# Vehicle collision box — bottom at y=0.05 (matches sidewalk collision top)
+		# This lets the car slide horizontally onto sidewalks without hitting
+		# a vertical step. Box bottom = sidewalk collision top = 0.05m.
 		shape.size = Vector3(1.9, 1.4, 4.3)
 		col.shape = shape
-		col.position = Vector3(0, 0.7, 0)  # center at y=0.7, bottom at y=0.0
+		col.position = Vector3(0, 0.75, 0)  # center at y=0.75, bottom at y=0.05
 		vehicle.add_child(col)
 		
 		# Mesh container
