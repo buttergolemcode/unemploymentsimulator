@@ -44,9 +44,10 @@ func _build_mesh():
 		# Quaternius characters are roughly 1.8m tall, scale to match our collision
 		instance.scale = Vector3(1.0, 1.0, 1.0)
 		# Rotate to face forward (FBX may have different default orientation)
-		# Note: Quaternius characters face -Z by default (forward in Godot),
-		# so no rotation needed. If a model faces +Z, add PI here.
-		# instance.rotation.y = PI  # uncomment if model faces wrong way
+		# Quaternius characters face -Z by default (forward in Godot).
+		# Our NPC movement uses facing = atan2(dx, dz) which assumes +Z forward.
+		# So we rotate the model by PI to align mesh with movement direction.
+		instance.rotation.y = PI
 		mesh.add_child(instance)
 		# Add merchant badge if applicable
 		if is_merchant:

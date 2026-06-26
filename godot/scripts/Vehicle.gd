@@ -288,25 +288,29 @@ func _animate_wheels_and_body(delta: float, current_steer: float):
 	# setting rotation.y breaks the orientation and the wheels glitch
 	# into the car body. We skip animation until proper pivot-node setup
 	# is implemented.
+	# Front-wheel steering: turn front wheels left/right based on steer input.
+	# This works for BOTH box-mesh fallback AND real FBX models because
+	# wheel.rotation.y = X only overwrites the Y component, preserving the
+	# wheel's baked X/Z orientation (e.g. cylinder rotated for visual alignment).
+	var steer_visual_factor: float
+	if abs_speed < 1.0:
+		steer_visual_factor = 1.0
+	elif abs_speed < 5.0:
+		steer_visual_factor = 1.0
+	else:
+		steer_visual_factor = clamp(1.0 - (abs_speed - 5.0) / 17.0, 0.3, 1.0)
+	var target_steer_angle = current_steer * 0.5 * steer_visual_factor
+	for wheel in _front_wheels:
+		# Only set Y rotation, preserve X and Z (which keep wheel upright)
+		wheel.rotation.y = lerp(wheel.rotation.y, target_steer_angle, delta * 8.0)
+	
+	# Wheel spin (X-axis rotation): ONLY for box-mesh fallback.
+	# For real FBX models, rotate_x() would accumulate on top of baked
+	# orientation and cause wheels to clip into the body.
 	if _use_box_mesh:
-		# Wheel spin: rotate around local X axis based on speed
-		var spin_rate = speed * 3.0  # rad/s, tuned for visual feel
+		var spin_rate = speed * 3.0
 		for wheel in _wheel_nodes:
 			wheel.rotate_x(spin_rate * delta)
-		
-		# Front wheel steering: turn front wheels left/right based on steer input.
-		# Realistic max steering angle ~30 degrees at full lock (low speed),
-		# reduced at high speed for stability.
-		var steer_visual_factor: float
-		if abs_speed < 1.0:
-			steer_visual_factor = 1.0
-		elif abs_speed < 5.0:
-			steer_visual_factor = 1.0
-		else:
-			steer_visual_factor = clamp(1.0 - (abs_speed - 5.0) / 17.0, 0.3, 1.0)
-		var target_steer_angle = current_steer * 0.5 * steer_visual_factor
-		for wheel in _front_wheels:
-			wheel.rotation.y = lerp(wheel.rotation.y, target_steer_angle, delta * 8.0)
 
 	# Body roll: lean into turns based on steer input and speed
 	# More speed + more steer = more roll. Cap at small angle for subtlety.

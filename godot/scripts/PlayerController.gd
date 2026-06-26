@@ -200,8 +200,10 @@ func _build_mesh():
         if packed_scene != null:
                 var instance = packed_scene.instantiate()
                 instance.scale = Vector3(1.0, 1.0, 1.0)
-                # Quaternius characters face -Z by default, no rotation needed
-                # instance.rotation.y = PI  # uncomment if model faces wrong way
+                # Quaternius characters face -Z by default (forward in Godot).
+                # Rotate by PI to align mesh with player's movement direction
+                # (player movement uses -Z forward convention).
+                instance.rotation.y = PI
                 mesh_node.add_child(instance)
                 return
 
