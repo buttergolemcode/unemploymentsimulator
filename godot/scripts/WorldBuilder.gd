@@ -80,29 +80,40 @@ static func terrain_height(x: float, z: float) -> float:
 static func _init_districts() -> void:
 	if not DISTRICTS.is_empty():
 		return
+	# Polygons aligned with the organic island geography:
+	#   portofino     = NE quadrant (+X, -Z)
+	#   harbor        = SE quadrant (+X, +Z)
+	#   slums_suburbs = W/NW (-X, both Z)
+	#   nyc           = center (around origin)
+	# Boundaries chosen so each polygon roughly covers its spec'd region
+	# without overlapping the others.
 	DISTRICTS = {
 		"portofino": {
-			"color": "#d4a574", "height_min": 8, "height_max": 20, "ground": "#8a7a5a",
+			"color": "#d4a574", "height_min": 8, "height_max": 100, "ground": "#8a7a5a",
 			"polygon": PackedVector2Array([
-				Vector2(-50, -800), Vector2(800, -800), Vector2(800, 100), Vector2(-50, 100)
+				Vector2(0, -1200), Vector2(1300, -1200),
+				Vector2(1300, 0), Vector2(0, 0)
 			])
 		},
 		"nyc": {
 			"color": "#1e293b", "height_min": 40, "height_max": 150, "ground": "#1a1a1a",
 			"polygon": PackedVector2Array([
-				Vector2(-200, -300), Vector2(300, -300), Vector2(300, 400), Vector2(-200, 400)
+				Vector2(-400, -400), Vector2(400, -400),
+				Vector2(400, 400), Vector2(-400, 400)
 			])
 		},
 		"harbor": {
 			"color": "#1c1917", "height_min": 8, "height_max": 20, "ground": "#171717",
 			"polygon": PackedVector2Array([
-				Vector2(100, 100), Vector2(800, 100), Vector2(800, 800), Vector2(100, 800)
+				Vector2(0, 0), Vector2(1300, 0),
+				Vector2(1300, 1300), Vector2(0, 1300)
 			])
 		},
 		"slums_suburbs": {
-			"color": "#5a4030", "height_min": 4, "height_max": 12, "ground": "#2a2a1a",
+			"color": "#5a4030", "height_min": 4, "height_max": 50, "ground": "#2a2a1a",
 			"polygon": PackedVector2Array([
-				Vector2(-800, -800), Vector2(-100, -800), Vector2(-100, 800), Vector2(-800, 800)
+				Vector2(-1300, -1200), Vector2(0, -1200),
+				Vector2(0, 1300), Vector2(-1300, 1300)
 			])
 		},
 	}
@@ -134,10 +145,66 @@ static func build_world(parent: Node3D) -> void:
 
 # ============================================================
 # TERRAIN — heightmap mesh + collision grid
+# Modular sub-builders: each handles one coloring layer.
 # ============================================================
+
+# Terrain color palette — used for slope/height-based vertex coloring
+const COL_DEEP_SEA   := Color(0.04, 0.18, 0.32)
+const COL_SHALLOW    := Color(0.10, 0.35, 0.50)
+const COL_SAND       := Color(0.78, 0.70, 0.50)
+const COL_GRASS      := Color(0.30, 0.42, 0.20)
+const COL_GRASS_DRY  := Color(0.55, 0.50, 0.28)
+const COL_ROCK       := Color(0.45, 0.40, 0.35)
+const COL_CLIFF      := Color(0.32, 0.28, 0.24)
+const COL_SNOW       := Color(0.92, 0.92, 0.95)
+const COL_URBAN      := Color(0.18, 0.18, 0.20)
+const COL_PORTOFINO  := Color(0.68, 0.55, 0.35)
+const COL_HARBOR     := Color(0.24, 0.22, 0.20)
+const COL_SLUMS      := Color(0.32, 0.24, 0.18)
+const COL_SUBURB     := Color(0.42, 0.48, 0.32)
+
+static func _terrain_color_at(x: float, z: float, h: float, slope: float) -> Color:
+	# Default: by region
+	var dist_id = get_district_at(x, z)
+	var base: Color
+	match dist_id:
+		"nyc":          base = COL_URBAN
+		"harbor":       base = COL_HARBOR
+		"portofino":    base = COL_PORTOFINO
+		"slums_suburbs":
+			# Suburbs (north, z<0) greener, slums (south) browner
+			if z < -150:
+				base = COL_SUBURB
+			else:
+				base = COL_SLUMS
+		_:              base = COL_DEEP_SEA
+	# Below sea level: water
+	if h < -1.0:
+		return COL_DEEP_SEA.lerp(COL_SHALLOW, clamp((-h) / 15.0, 0.0, 1.0))
+	# Shallow water just below 0
+	if h < 0.2:
+		return COL_SHALLOW
+	# Beach: sand near water and flat
+	if h < 2.5 and slope < 0.25:
+		return COL_SAND.lerp(base, clamp((h - 0.2) / 2.3, 0.0, 1.0))
+	# Cliffs on steep slopes (regardless of region, but only above water)
+	if slope > 0.65 and h > 2.0:
+		return COL_CLIFF.lerp(COL_ROCK, clamp((slope - 0.65) / 0.5, 0.0, 1.0))
+	# Rocky slopes
+	if slope > 0.40 and h > 2.0:
+		return base.lerp(COL_ROCK, clamp((slope - 0.40) / 0.25, 0.0, 1.0))
+	# High peaks: rock → snow
+	if h > 55.0:
+		return COL_ROCK.lerp(COL_SNOW, clamp((h - 55.0) / 25.0, 0.0, 1.0))
+	# Mid-elevation in portofino/suburbs: dry grass on drier slopes
+	if dist_id == "portofino" and h > 25.0:
+		return base.lerp(COL_GRASS_DRY, clamp((h - 25.0) / 30.0, 0.0, 1.0))
+	# Default: region color
+	return base
+
 static func _build_terrain(parent: Node3D) -> void:
 	var size = 2700
-	var segs = 150
+	var segs = 250  # higher resolution for smoother terrain features
 	var mesh = PlaneMesh.new()
 	mesh.size = Vector2(size, size)
 	mesh.subdivide_width = segs
@@ -146,61 +213,82 @@ static func _build_terrain(parent: Node3D) -> void:
 	surf.create_from(mesh, 0)
 	var mdt = MeshDataTool.new()
 	mdt.create_from_surface(surf.commit(), 0)
+
+	# Pass 1: assign Y from heightmap
 	for i in mdt.get_vertex_count():
 		var v = mdt.get_vertex(i)
 		v.y = terrain_height(v.x, v.z)
 		mdt.set_vertex(i, v)
-		var col: Color
-		var dist_id = get_district_at(v.x, v.z)
-		match dist_id:
-			"nyc": col = Color(0.12, 0.12, 0.14)
-			"harbor": col = Color(0.14, 0.14, 0.14)
-			"portofino": col = Color(0.55, 0.45, 0.30)
-			"slums_suburbs": col = Color(0.20, 0.18, 0.12)
-			_: col = Color(0.08, 0.18, 0.32)
+
+	# Pass 2: compute slope per vertex (gradient from neighbors)
+	# We sample terrain at small offset to compute slope.
+	var sample_step = size / float(segs) * 0.6
+	for i in mdt.get_vertex_count():
+		var v = mdt.get_vertex(i)
+		# Sample heights in +X and +Z direction
+		var hx1 = terrain_height(v.x + sample_step, v.z)
+		var hx0 = terrain_height(v.x - sample_step, v.z)
+		var hz1 = terrain_height(v.x, v.z + sample_step)
+		var hz0 = terrain_height(v.x, v.z - sample_step)
+		var dx = (hx1 - hx0) / (2.0 * sample_step)
+		var dz = (hz1 - hz0) / (2.0 * sample_step)
+		# Slope magnitude (rise / run); 0 = flat, 1 = 45°, >1 = steeper
+		var slope = sqrt(dx * dx + dz * dz)
+		var col = _terrain_color_at(v.x, v.z, v.y, slope)
 		mdt.set_vertex_color(i, col)
-	var final_mesh = ArrayMesh.new()
-	mdt.commit_to_surface(final_mesh)
+
+	# Recompute normals so lighting looks smooth
+	var tmp_mesh = ArrayMesh.new()
+	mdt.commit_to_surface(tmp_mesh)
+	var surf2 = SurfaceTool.new()
+	surf2.create_from(tmp_mesh, 0)
+	surf2.recalculate_normals()
+	surf2.recalculate_tangents()
+	var final_mesh = surf2.commit()
+
 	var mi = MeshInstance3D.new()
 	mi.mesh = final_mesh
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DISABLED
 	var mat = StandardMaterial3D.new()
 	mat.vertex_color_use_as_albedo = true
 	mat.roughness = 0.95
+	mat.metalness = 0.0
 	mi.material_override = mat
-	# Collision: terrain-following grid
+
+	# Collision: terrain-following grid (smaller cells for cliffs/bays)
 	var terrain_body = StaticBody3D.new()
 	terrain_body.name = "TerrainGround"
-	var grid = 60
-	for gx in range(-1300, 1301, grid):
-		for gz in range(-1300, 1301, grid):
+	var grid = 35  # finer collision grid for cliffs and bays
+	for gx in range(-1350, 1351, grid):
+		for gz in range(-1350, 1351, grid):
 			var h = terrain_height(gx, gz)
-			if h < -1:
-				continue
+			if h < -1.5:
+				continue  # sea — no collision (water plane handles it)
 			var rcol = CollisionShape3D.new()
 			var rshape = BoxShape3D.new()
-			rshape.size = Vector3(grid, 1.0, grid)
+			rshape.size = Vector3(grid, 1.5, grid)
 			rcol.shape = rshape
-			rcol.position = Vector3(gx, h - 0.5, gz)
+			rcol.position = Vector3(gx, h - 0.75, gz)
 			terrain_body.add_child(rcol)
 	parent.add_child(terrain_body)
 	parent.add_child(mi)
 
 # ============================================================
-# SEA — water plane around island
+# SEA — large water plane around island
 # ============================================================
 static func _build_sea(parent: Node3D) -> void:
 	var plane = PlaneMesh.new()
-	plane.size = Vector2(4000, 4000)
+	plane.size = Vector2(4500, 4500)
 	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.08, 0.30, 0.45, 0.85)
+	mat.albedo_color = Color(0.06, 0.28, 0.42, 0.88)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.roughness = 0.15
-	mat.metalness = 0.4
+	mat.roughness = 0.12
+	mat.metalness = 0.55
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	plane.material = mat
 	var mi = MeshInstance3D.new()
 	mi.mesh = plane
-	mi.position = Vector3(0, -3.0, 0)
+	mi.position = Vector3(0, -2.8, 0)
 	parent.add_child(mi)
 
 # ============================================================
