@@ -6,6 +6,15 @@ const SPRINT_SPEED = 8.0
 const MOUSE_SENS = 0.0022
 const PITCH_LIMIT = 1.5
 
+# ============================================================
+# DEBUG MODE — REMOVE BEFORE RELEASE
+# Toggle with F1, noclip with F2, speed boost with F3
+# ============================================================
+const DEBUG_NOCLIP_SPEED: float = 30.0
+const DEBUG_NOCLIP_FAST_SPEED: float = 80.0
+var debug_noclip: bool = false
+var debug_fast: bool = false
+
 var yaw: float = 0.0
 var camera_yaw: float = 0.0  # independent camera orbit yaw (mouse-controlled, used in vehicle)
 var pitch: float = 0.0
@@ -27,6 +36,25 @@ func _ready():
 func _unhandled_input(event):
 	if GameManager.phase != "playing":
 		return
+	
+	# === DEBUG KEYS — REMOVE BEFORE RELEASE ===
+	if event is InputEventKey and event.pressed:
+		match event.keycode:
+			KEY_F1:
+				debug_noclip = not debug_noclip
+				motion_mode = CharacterBody3D.MOTION_MODE_FLOATING if debug_noclip else CharacterBody3D.MOTION_MODE_GROUNDED
+				print("[DEBUG] Noclip: ", debug_noclip)
+			KEY_F2:
+				debug_fast = not debug_fast
+				print("[DEBUG] Fast mode: ", debug_fast)
+			KEY_F3:
+				# Teleport to ground at current XZ (useful when stuck)
+				var ground_y = WorldBuilder.terrain_height(global_position.x, global_position.z)
+				global_position.y = ground_y + 2.0
+				print("[DEBUG] Teleported to ground at Y=", ground_y)
+			KEY_F4:
+				# Print current position (useful for debugging)
+				print("[DEBUG] Position: ", global_position, " District: ", WorldBuilder.get_district_at(global_position.x, global_position.z))
 	
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if in_vehicle:
@@ -65,13 +93,11 @@ func _physics_process(delta):
 	
 	if in_vehicle:
 		visible = false
-		# Camera follows vehicle (chase cam)
 		_update_vehicle_camera()
 		return
 	
 	visible = camera_mode == "third"
 	rotation.y = yaw
-	# Camera is top_level so set full rotation explicitly
 	
 	var input_forward = 0.0
 	var input_right = 0.0
@@ -84,20 +110,33 @@ func _physics_process(delta):
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 		input_right += 1.0
 	
-	var forward = Vector3(-sin(yaw), 0, -cos(yaw))
-	var right = Vector3(cos(yaw), 0, -sin(yaw))
-	var wish_dir = (forward * input_forward + right * input_right).normalized()
-	
-	var speed = SPRINT_SPEED if Input.is_key_pressed(KEY_SHIFT) else WALK_SPEED
-	velocity.x = wish_dir.x * speed
-	velocity.z = wish_dir.z * speed
-	
-	if not is_on_floor():
-		velocity.y -= 9.8 * delta
+	# === DEBUG NOCLIP MODE ===
+	if debug_noclip:
+		var forward3 = Vector3(-sin(yaw), -sin(pitch), -cos(yaw)).normalized()
+		var right3 = Vector3(cos(yaw), 0, -sin(yaw))
+		var wish = (forward3 * input_forward + right3 * input_right).normalized()
+		var fly_speed = DEBUG_NOCLIP_FAST_SPEED if (debug_fast or Input.is_key_pressed(KEY_SHIFT)) else DEBUG_NOCLIP_SPEED
+		velocity = wish * fly_speed
+		# Space = up, Ctrl = down
+		if Input.is_key_pressed(KEY_SPACE):
+			velocity.y = fly_speed
+		elif Input.is_key_pressed(KEY_CTRL):
+			velocity.y = -fly_speed
+		move_and_slide()
 	else:
-		velocity.y = 0
-	
-	move_and_slide()
+		var forward = Vector3(-sin(yaw), 0, -cos(yaw))
+		var right = Vector3(cos(yaw), 0, -sin(yaw))
+		var wish_dir = (forward * input_forward + right * input_right).normalized()
+		var speed = SPRINT_SPEED if Input.is_key_pressed(KEY_SHIFT) else WALK_SPEED
+		if debug_fast:
+			speed *= 4.0
+		velocity.x = wish_dir.x * speed
+		velocity.z = wish_dir.z * speed
+		if not is_on_floor():
+			velocity.y -= 9.8 * delta
+		else:
+			velocity.y = 0
+		move_and_slide()
 	
 	if camera_mode == "first":
 		camera.global_position = global_position + Vector3(0, 1.6, 0)
