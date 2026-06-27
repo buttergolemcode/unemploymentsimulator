@@ -1,59 +1,35 @@
 #!/usr/bin/env python3
 """
-Generate a Heightmap PNG for the Portofino-inspired coastal city.
+Generate Heightmap PNG for the island map with 4 regions.
+Island is irregular/organic shape, surrounded by sea.
 
-Map: 3000x3000m, Heightmap: 1024x1024 pixels (1 pixel ≈ 2.93m)
-Height range: 0-255 (8-bit grayscale), mapped to 0-100m terrain height
+Regions (clockwise from North):
+1. Portofino (Northeast) — hilly coast, slopes down to sea, cliffs, bay, peninsula
+2. NYC Downtown (Center/Southwest) — flat urban
+3. Harbor (Southeast) — flat at sea level, harbor basin
+4. Slums/Suburbs (West/Northwest) — slightly hilly, transition zone
 
-Layout (West → East, land falls toward sea):
-- Canyon walls (West/North/South edges): 80-100m
-- Rural (far west): 60-80m, rolling hills
-- Suburbs: 40-50m, gentle slopes
-- Industrial: 25-30m, plateau
-- Downtown: 5-15m, slope down to harbor
-- Harbor: 0m, sea level
-- Sea (far east): -3m (below 0, mapped to 0 in heightmap)
-
-Portofino coastal features:
-- Moon-shaped bay at harbor (x≈1200, z≈0)
-- Peninsula jutting into sea (x≈1400, z≈200)
-- Cliffs south of harbor (steep drop at z>300, x>1000)
-- Beach north of harbor (gentle slope at z<-300, x>1000)
-- Castle hill above harbor (elevated point at x≈900, z≈0)
+Connected by roads through transition zones (forest, hills, coast).
 """
 
 from PIL import Image
 import math
-import os
 
 # Heightmap dimensions
 W, H = 1024, 1024
-
-# Map dimensions in meters
-MAP_SIZE = 3000.0  # -1500 to +1500
-
-# Height scale: 0-255 in PNG = 0-120m in world
+MAP_SIZE = 2500.0  # -1250 to +1250 (smaller than before)
 MAX_HEIGHT = 120.0
 
-def world_to_pixel(x, z):
-    """Convert world coordinates (-1500..1500) to pixel (0..1023)."""
-    px = int((x + 1500) / MAP_SIZE * W)
-    pz = int((z + 1500) / MAP_SIZE * H)
-    return max(0, min(W-1, px)), max(0, min(H-1, pz))
-
 def pixel_to_world(px, pz):
-    """Convert pixel to world coordinates."""
-    x = (px / W) * MAP_SIZE - 1500
-    z = (pz / H) * MAP_SIZE - 1500
+    x = (px / W) * MAP_SIZE - MAP_SIZE / 2
+    z = (pz / H) * MAP_SIZE - MAP_SIZE / 2
     return x, z
 
 def smooth_noise(x, z, scale=0.01):
-    """Simple smooth noise for natural terrain variation."""
     h = math.sin(x * scale * 127.1 + z * scale * 311.7) * 43758.5453
     return h - math.floor(h)
 
 def fractal_noise(x, z, octaves=3, scale=0.003):
-    """Fractal noise for natural hills."""
     value = 0.0
     amp = 1.0
     freq = 1.0
@@ -65,154 +41,219 @@ def fractal_noise(x, z, octaves=3, scale=0.003):
         freq *= 2
     return value / max_val if max_val > 0 else 0
 
-def height_to_pixel(height_m):
-    """Convert height in meters to 0-255 pixel value."""
-    return max(0, min(255, int(height_m / MAX_HEIGHT * 255)))
+def island_radius(angle):
+    """Organic island shape — radius varies with angle (noise-modulated)."""
+    # Base radius ~900m, modulated by harmonics for organic shape
+    base = 900.0
+    r = base
+    r += math.sin(angle * 1.0) * 120.0   # elongation
+    r += math.sin(angle * 2.3 + 0.5) * 80.0   # bump
+    r += math.sin(angle * 3.7 + 1.2) * 60.0   # smaller bumps
+    r += math.sin(angle * 5.1 + 2.8) * 40.0   # detail
+    r += math.cos(angle * 7.0 + 0.3) * 25.0   # fine detail
+    # Peninsula bump in northeast direction (Portofino)
+    pen_angle = math.radians(45)  # NE
+    angle_diff = abs(angle - pen_angle)
+    if angle_diff > math.pi:
+        angle_diff = 2 * math.pi - angle_diff
+    if angle_diff < math.radians(25):
+        pen_factor = 1.0 - (angle_diff / math.radians(25))
+        r += pen_factor * 200.0  # peninsula extends 200m extra
+    # Bay indentation in southeast (Harbor)
+    bay_angle = math.radians(135)  # SE
+    angle_diff2 = abs(angle - bay_angle)
+    if angle_diff2 > math.pi:
+        angle_diff2 = 2 * math.pi - angle_diff2
+    if angle_diff2 < math.radians(20):
+        bay_factor = 1.0 - (angle_diff2 / math.radians(20))
+        r -= bay_factor * 150.0  # bay cuts 150m into island
+    return max(200.0, r)
+
+def is_on_island(x, z):
+    """Check if point is on the island (inside organic shape)."""
+    dist = math.sqrt(x * x + z * z)
+    if dist < 10:
+        return True, 1.0
+    angle = math.atan2(z, x)
+    r = island_radius(angle)
+    if dist <= r:
+        return True, 1.0 - (dist / r)  # 1.0 at center, 0.0 at coast
+    # Smooth coast edge
+    if dist <= r + 30:
+        return True, max(0, 1.0 - (dist - r) / 30) * 0.3
+    return False, 0.0
+
+def get_region(x, z):
+    """Determine which region a point belongs to (rough zones)."""
+    angle = math.atan2(z, x)
+    dist = math.sqrt(x * x + z * z)
+
+    # Portofino: Northeast (angle 10° to 100°), outer part of island
+    if -10 <= math.degrees(angle) <= 100 and dist > 300:
+        return "portofino"
+    # Harbor: Southeast (angle 100° to 180°), coastal
+    if 100 <= math.degrees(angle) <= 180 and dist > 200:
+        return "harbor"
+    # Slums/Suburbs: West/Northwest (angle 180° to 290°)
+    if 180 <= math.degrees(angle) <= 290:
+        return "slums_suburbs"
+    # NYC Downtown: Center/Southwest (everything else, inner)
+    return "nyc"
 
 def get_terrain_height(x, z):
-    """
-    Calculate terrain height at world position (x, z).
-    Returns height in meters (0 = sea level, negative = underwater).
-    """
+    """Calculate terrain height at world position."""
+    on_island, coast_factor = is_on_island(x, z)
+
+    if not on_island:
+        # Sea — deeper further from island
+        angle = math.atan2(z, x)
+        r = island_radius(angle)
+        dist = math.sqrt(x * x + z * z)
+        depth = (dist - r) / 100.0
+        return -3.0 - min(depth * 2.0, 15.0)
+
     noise = fractal_noise(x, z, 3, 0.003)
     noise2 = fractal_noise(x + 500, z + 500, 2, 0.005)
-    
-    # === CANYON WALLS (West/North/South edges) ===
-    canyon_west = -1200
-    canyon_north = -1200
-    canyon_south = 1200
-    
-    canyon_dist = 0
-    if x < canyon_west:
-        canyon_dist = max(canyon_dist, canyon_west - x)
-    if z < canyon_north:
-        canyon_dist = max(canyon_dist, canyon_north - z)
-    if z > canyon_south:
-        canyon_dist = max(canyon_dist, z - canyon_south)
-    
-    if canyon_dist > 0:
-        return 100.0 * min(canyon_dist / 300.0, 1.0) + noise * 20
-    
-    # === SEA (east of coast) ===
-    coast_x = 1500
-    if x > coast_x:
-        return -3.0 - min((x - coast_x) / 200.0, 1.0) * 15
-    
-    # === HARBOR (x: +600 to +1500) — sea level with coastal features ===
-    if x > 600:
-        h = 0.0 + noise * 0.5
-        
-        # Moon-shaped bay: depression at harbor center (x≈1200, z≈0)
-        bay_cx, bay_cz = 1200, 0
-        bay_dist = math.sqrt((x - bay_cx)**2 + (z - bay_cz)**2)
-        bay_radius = 250
-        if bay_dist < bay_radius:
-            bay_factor = 1.0 - (bay_dist / bay_radius)
-            h -= bay_factor * 3.0  # dip below sea level in bay
-        
-        # Peninsula: elevated land jutting into sea (x≈1400, z≈200)
-        pen_cx, pen_cz = 1400, 200
-        pen_dist = math.sqrt((x - pen_cx)**2 + (z - pen_cz)**2)
-        pen_radius = 150
-        if pen_dist < pen_radius:
-            pen_factor = 1.0 - (pen_dist / pen_radius)
-            h += pen_factor * 25.0  # elevated peninsula
-        
-        # Castle hill: elevated point above harbor (x≈900, z≈0)
-        castle_cx, castle_cz = 900, 0
-        castle_dist = math.sqrt((x - castle_cx)**2 + (z - castle_cz)**2)
-        castle_radius = 100
-        if castle_dist < castle_radius:
-            castle_factor = 1.0 - (castle_dist / castle_radius)
-            h += castle_factor * 15.0  # castle hill
-        
-        # Cliffs south of harbor (z > 300, x > 1000): steep drop
-        if z > 300 and x > 1000:
-            cliff_factor = min((z - 300) / 100.0, 1.0)
-            h -= cliff_factor * 5.0  # drop off at cliffs
-        
-        # Beach north of harbor (z < -300, x > 1000): gentle slope to water
-        if z < -300 and x > 1000:
-            beach_factor = min((-z - 300) / 200.0, 1.0)
-            h -= beach_factor * 2.0  # gentle beach slope
-        
-        return h
-    
-    # === DOWNTOWN (x: +100 to +600) — gentle slope 5-15m down to harbor ===
-    if x > 100:
-        dt_blend = (600 - x) / 500.0  # 0 at harbor edge, 1 at inland
-        return dt_blend * 15.0 + noise * 2.0
-    
-    # === INDUSTRIAL (x: -600 to +100) — plateau at 25m ===
-    if x > -600:
-        return 25.0 + noise * 3.0
-    
-    # === SUBURBS (x: -1000 to -400) — rolling hills 40-50m ===
-    if x > -1000:
-        return 45.0 + noise * 8.0
-    
-    # === RURAL (x: -1200 to -800) — higher hills 60-80m ===
-    if x > -1200:
-        r_blend = (-800 - x) / 400.0
-        return 60.0 + r_blend * 20.0 + noise * 10.0
-    
-    return 0.0
+    region = get_region(x, z)
+    dist = math.sqrt(x * x + z * z)
+
+    # === PORTOFINO (Northeast) — hilly coast sloping down to sea ===
+    if region == "portofino":
+        # Base height: higher inland, lower toward coast
+        h = 35.0 + noise * 15.0  # 20-50m inland
+
+        # Slope down toward sea (coast_factor: 1.0 center → 0.0 coast)
+        h *= 0.3 + coast_factor * 0.7  # flatten near coast
+
+        # Castle hill: elevated point above harbor (NE coast, ~600m out)
+        castle_x, castle_z = 600, -300
+        castle_dist = math.sqrt((x - castle_x)**2 + (z - castle_z)**2)
+        if castle_dist < 120:
+            h += (1.0 - castle_dist / 120) * 30.0  # +30m peak
+
+        # Peninsula: elevated land jutting into sea (NE, ~800m out)
+        pen_x, pen_z = 800, -500
+        pen_dist = math.sqrt((x - pen_x)**2 + (z - pen_z)**2)
+        if pen_dist < 200:
+            h += (1.0 - pen_dist / 200) * 25.0  # elevated peninsula
+
+        # Moon-shaped bay: depression at coast (NE, ~700m out)
+        bay_x, bay_z = 700, -100
+        bay_dist = math.sqrt((x - bay_x)**2 + (z - bay_z)**2)
+        if bay_dist < 150 and coast_factor < 0.3:
+            h -= (1.0 - bay_dist / 150) * 10.0  # dip below sea level
+
+        # Cliffs on south side of portofino coast (steep drop)
+        if coast_factor < 0.15 and z > 0:
+            h -= 5.0  # sharp drop at southern cliffs
+
+        return max(-2.0, h)
+
+    # === HARBOR (Southeast) — flat at sea level ===
+    if region == "harbor":
+        h = 0.0 + noise * 0.5  # almost flat
+
+        # Harbor basin: depression (SE coast)
+        basin_x, basin_z = 300, 600
+        basin_dist = math.sqrt((x - basin_x)**2 + (z - basin_z)**2)
+        if basin_dist < 200 and coast_factor < 0.4:
+            h -= (1.0 - basin_dist / 200) * 5.0  # harbor basin dip
+
+        # Beach on north side (gentle slope to water)
+        if coast_factor < 0.2 and z < 400:
+            h -= 2.0  # gentle beach slope
+
+        # Container storage area: slightly raised (flat plateau)
+        if 100 < x < 400 and 300 < z < 600:
+            h += 1.0  # raised loading area
+
+        return max(-3.0, h)
+
+    # === SLUMS/SUBURBS (West/Northwest) — slightly hilly ===
+    if region == "slums_suburbs":
+        # Gentle hills 10-30m
+        h = 15.0 + noise * 12.0  # 3-27m rolling hills
+
+        # Slums area: lower, flatter (closer to harbor, south part)
+        if z > -100:
+            h = 8.0 + noise * 5.0  # 3-13m, flatter (slums)
+
+        # Suburbs: slightly higher (north part)
+        if z < -200:
+            h = 20.0 + noise * 10.0  # 10-30m, rolling (suburbs)
+
+        # Coast: cliffs on west side
+        if coast_factor < 0.15:
+            h -= 3.0  # slight coastal drop
+
+        return max(-2.0, h)
+
+    # === NYC DOWNTOWN (Center/Southwest) — relatively flat ===
+    # Flat urban center 0-10m with slight slope toward harbor
+    h = 5.0 + noise * 2.0  # 3-7m, very flat
+
+    # Slight slope toward SE (harbor direction)
+    angle = math.atan2(z, x)
+    if 90 < math.degrees(angle) < 180:
+        h -= 2.0  # slope down toward harbor
+
+    return max(-1.0, h)
+
+def height_to_pixel(height_m):
+    return max(0, min(255, int((height_m + 20) / (MAX_HEIGHT + 20) * 255)))
 
 def generate_heightmap():
-    """Generate the heightmap PNG."""
-    print("Generating heightmap...")
-    img = Image.new('L', (W, H))  # 8-bit grayscale
+    print("Generating island heightmap...")
+    img = Image.new('L', (W, H))
     pixels = img.load()
-    
+
     for py in range(H):
         for px in range(W):
             x, z = pixel_to_world(px, py)
             h = get_terrain_height(x, z)
             pixels[px, py] = height_to_pixel(h)
-        
         if py % 100 == 0:
             print(f"  Row {py}/{H}...")
-    
+
     output_path = '/home/z/my-project/godot/assets/heightmap.png'
     img.save(output_path)
     print(f"Heightmap saved to {output_path}")
-    print(f"Size: {W}x{H} pixels, {MAP_SIZE}x{MAP_SIZE}m world")
-    print(f"Height range: 0-{MAX_HEIGHT}m (0-255 in PNG)")
-    
-    # Also save a colorized version for visual reference
+
+    # Colorized preview
     img_color = Image.new('RGB', (W, H))
-    color_pixels = img_color.load()
+    cp = img_color.load()
     for py in range(H):
         for px in range(W):
             val = pixels[px, py]
+            h = (val / 255.0) * (MAX_HEIGHT + 20) - 20
             x, z = pixel_to_world(px, py)
-            h = val / 255.0 * MAX_HEIGHT
-            
-            if h < 0:
-                # Deep water
-                color_pixels[px, py] = (10, 40, 80)
+            region = get_region(x, z)
+
+            if h < -1:
+                cp[px, py] = (10, 50, 90)  # deep water
+            elif h < 0:
+                cp[px, py] = (30, 100, 140)  # shallow water
             elif h < 1:
-                # Shallow water / beach
-                color_pixels[px, py] = (180, 160, 100)
-            elif h < 5:
-                # Harbor/coast
-                color_pixels[px, py] = (80, 80, 80)
-            elif h < 20:
-                # Downtown
-                color_pixels[px, py] = (60, 60, 70)
-            elif h < 35:
-                # Industrial
-                color_pixels[px, py] = (70, 70, 75)
-            elif h < 55:
-                # Suburbs
-                color_pixels[px, py] = (80, 120, 60)
-            elif h < 85:
-                # Rural
-                color_pixels[px, py] = (100, 90, 50)
+                cp[px, py] = (200, 180, 120)  # beach/sand
+            elif region == "portofino":
+                if h > 30:
+                    cp[px, py] = (90, 80, 60)  # rock/cliff
+                elif h > 15:
+                    cp[px, py] = (120, 110, 70)  # hills
+                else:
+                    cp[px, py] = (180, 160, 100)  # coastal town
+            elif region == "nyc":
+                cp[px, py] = (50, 50, 60)  # urban gray
+            elif region == "harbor":
+                cp[px, py] = (60, 55, 50)  # harbor brown-gray
+            elif region == "slums_suburbs":
+                if h > 15:
+                    cp[px, py] = (100, 130, 70)  # suburb green
+                else:
+                    cp[px, py] = (100, 70, 50)  # slum brown
             else:
-                # Canyon/mountain
-                color_pixels[px, py] = (120, 110, 100)
-    
+                cp[px, py] = (80, 80, 80)
+
     color_path = '/home/z/my-project/godot/assets/heightmap_preview.png'
     img_color.save(color_path)
     print(f"Colorized preview saved to {color_path}")
