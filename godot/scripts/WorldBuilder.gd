@@ -147,14 +147,9 @@ static func get_district_at(x: float, z: float) -> String:
 # ============================================================
 
 static func terrain_height(x: float, z: float) -> float:
-	# City area (Downtown to Harbor): completely flat
-	if x > -800 and x < 1500 and z > -600 and z < 600:
-		return 0.0
-	# Rural zone: hills rising toward canyon walls
-	if x > -1200 and x < -800:
-		var blend = clamp((-800 - x) / 400.0, 0, 1)
-		return _fractal_noise(x, z, 2) * 10 * blend
-	# Beyond canyon edges: mountain height
+	# Portofino-inspired: land falls from West (high) to East (sea, low)
+	var noise = _fractal_noise(x, z, 2)
+	# Canyon walls (West/North/South edges)
 	if x < CANYON_EDGE_WEST or z < CANYON_EDGE_NORTH or z > CANYON_EDGE_SOUTH:
 		var dist = 0.0
 		if x < CANYON_EDGE_WEST:
@@ -163,10 +158,27 @@ static func terrain_height(x: float, z: float) -> float:
 			dist = max(dist, CANYON_EDGE_NORTH - z)
 		if z > CANYON_EDGE_SOUTH:
 			dist = max(dist, z - CANYON_EDGE_SOUTH)
-		return CANYON_HEIGHT * clamp(dist / 300.0, 0, 1) + _fractal_noise(x, z, 3) * 20
-	# Water (east of harbor)
+		return CANYON_HEIGHT * clamp(dist / 300.0, 0, 1) + noise * 20
+	# Water (east of coast)
 	if x > WATER_OFFSET:
 		return -3.0 - clamp((x - WATER_OFFSET) / 200.0, 0, 1) * 15
+	# Harbor (x: +600 to +1500): sea level (0m)
+	if x > 600:
+		return 0.0 + noise * 0.5
+	# Downtown (x: +100 to +800): gentle hill 5-15m, sloping down to harbor
+	if x > 100:
+		var dt_blend = (800 - x) / 700.0
+		return dt_blend * 15.0 + noise * 2.0
+	# Industrial (x: -600 to +200): plateau at 25m
+	if x > -600:
+		return 25.0 + noise * 3.0
+	# Suburbs (x: -1000 to -400): rolling hills 40-50m
+	if x > -1000:
+		return 45.0 + noise * 8.0
+	# Rural (x: -1200 to -800): higher hills 60-80m
+	if x > -1200:
+		var r_blend = (-800 - x) / 400.0
+		return 60.0 + r_blend * 20.0 + noise * 10.0
 	return 0.0
 
 static func _hash2(x: float, z: float) -> float:
@@ -276,38 +288,26 @@ static func _build_terrain(parent: Node3D) -> void:
 	# Disable depth write to prevent z-fighting with overlapping ground layers
 	mi.material_override = mat
 	
-	# === COLLISION SYSTEM (proper — covers all terrain) ===
-	# 1) City ground (flat, covers entire city + rural area at y=0)
-	var city_body = StaticBody3D.new()
-	city_body.name = "CityGround"
-	var city_col = CollisionShape3D.new()
-	var city_shape = BoxShape3D.new()
-	city_shape.size = Vector3(3000, 1.0, 3000)  # 3000x3000 flat ground (covers city + inner rural)
-	city_col.shape = city_shape
-	city_col.position = Vector3(0, -0.5, 0)
-	city_body.add_child(city_col)
-	parent.add_child(city_body)
-	
-	# 2) Rural raised collision (DENSE GRID covering entire rural area)
-	# Old approach (12 boxes around perimeter) left gaps where cars fell through.
-	# New approach: grid of 50x50m boxes covering the full rural ring (380-580m radius)
-	var rural_body = StaticBody3D.new()
-	rural_body.name = "RuralGround"
-	var rural_grid = 80  # 80m spacing
-	for gx in range(-1200, 1201, rural_grid):
-		for gz in range(-1200, 1201, rural_grid):
-			var r = sqrt(gx * gx + gz * gz)
-			# Only place boxes in rural ring (between city edge and water)
-			if r < 380 or r > 580:
+	# === COLLISION: terrain-following grid (60m cells) ===
+	var terrain_body = StaticBody3D.new()
+	terrain_body.name = "TerrainGround"
+	var terrain_grid = 60
+	for gx in range(-1400, 1501, terrain_grid):
+		for gz in range(-1400, 1501, terrain_grid):
+			if gx > 1500:
+				continue
+			if gx < CANYON_EDGE_WEST - 100 or gz < CANYON_EDGE_NORTH - 100 or gz > CANYON_EDGE_SOUTH + 100:
+				continue
+			var h_at = terrain_height(gx, gz)
+			if h_at < -1:
 				continue
 			var rcol = CollisionShape3D.new()
 			var rshape = BoxShape3D.new()
-			rshape.size = Vector3(rural_grid, 1.0, rural_grid)
+			rshape.size = Vector3(terrain_grid, 1.0, terrain_grid)
 			rcol.shape = rshape
-			var h_at = terrain_height(gx, gz)
 			rcol.position = Vector3(gx, h_at - 0.5, gz)
-			rural_body.add_child(rcol)
-	parent.add_child(rural_body)
+			terrain_body.add_child(rcol)
+	parent.add_child(terrain_body)
 	
 	# 3) Mountain walls (impassable barriers at map edges — extended for larger map)
 	# North wall (z < -600)
@@ -395,10 +395,10 @@ static func _make_street(parent: Node3D, axis: String, pos: float) -> void:
 	var a_mesh = BoxMesh.new()
 	if axis == "x":
 		a_mesh.size = Vector3(length, 0.04, ROAD_HALF_WIDTH * 2)
-		asphalt.position = Vector3(0, 0.03, pos)  # raised to clear terrain (y=-0.05)
+		asphalt.position = Vector3(0, terrain_height(0, pos) + 0.03, pos)  # raised to clear terrain (y=-0.05)
 	else:
 		a_mesh.size = Vector3(ROAD_HALF_WIDTH * 2, 0.04, length)
-		asphalt.position = Vector3(pos, 0.03, 0)
+		asphalt.position = Vector3(pos, terrain_height(pos, 0) + 0.03, 0)
 	asphalt.mesh = a_mesh
 	var amat = StandardMaterial3D.new()
 	amat.albedo_color = Color(0.08, 0.08, 0.08)  # dark asphalt
@@ -579,7 +579,7 @@ static func _build_scheme_buildings(parent: Node3D) -> void:
 		var b_mesh = BoxMesh.new()
 		b_mesh.size = Vector3(b.w, b.h, b.d)
 		mesh.mesh = b_mesh
-		mesh.position = Vector3(b.x, b.h / 2.0, b.z)
+		mesh.position = Vector3(b.x, terrain_height(b.x, b.z) + b.h / 2.0, b.z)
 		var mat = StandardMaterial3D.new()
 		mat.albedo_color = Color.from_string(b.color, Color.GRAY)
 		mat.roughness = 0.6
@@ -593,7 +593,7 @@ static func _build_scheme_buildings(parent: Node3D) -> void:
 		
 		# Collision
 		var body = StaticBody3D.new()
-		body.position = Vector3(b.x, b.h / 2.0, b.z)
+		body.position = Vector3(b.x, terrain_height(b.x, b.z) + b.h / 2.0, b.z)
 		var col = CollisionShape3D.new()
 		var shape = BoxShape3D.new()
 		shape.size = Vector3(b.w, b.h, b.d)
@@ -604,7 +604,7 @@ static func _build_scheme_buildings(parent: Node3D) -> void:
 		# Label
 		var label = Label3D.new()
 		label.text = "%s %s" % [b.emoji, b.name]
-		label.position = Vector3(b.x, b.h + 2, b.z)
+		label.position = Vector3(b.x, terrain_height(b.x, b.z) + b.h + 2, b.z)
 		label.font_size = 48
 		label.outline_size = 6
 		label.outline_modulate = Color.BLACK
@@ -742,7 +742,7 @@ static func _make_district_building(parent: Node3D, x: float, z: float,
 			var b_mesh = BoxMesh.new()
 			b_mesh.size = Vector3(w, h, d)
 			mesh.mesh = b_mesh
-			mesh.position = Vector3(x, h / 2, z)
+			mesh.position = Vector3(x, terrain_height(x, z) + h / 2, z)
 			var mat = StandardMaterial3D.new()
 			var colors = ["#1e293b", "#0f172a", "#1e3a5f", "#1e293b", "#0c4a6e"]
 			mat.albedo_color = Color.from_string(colors[int(rng.call(1) * 5) % 5], Color.DIM_GRAY)
@@ -757,7 +757,7 @@ static func _make_district_building(parent: Node3D, x: float, z: float,
 			var b_mesh = BoxMesh.new()
 			b_mesh.size = Vector3(w, h, d)
 			mesh.mesh = b_mesh
-			mesh.position = Vector3(x, h / 2, z)
+			mesh.position = Vector3(x, terrain_height(x, z) + h / 2, z)
 			var mat = StandardMaterial3D.new()
 			var colors = ["#1c1917", "#292524", "#44403c", "#1f2937", "#0c0a09"]
 			mat.albedo_color = Color.from_string(colors[int(rng.call(1) * 5) % 5], Color.DIM_GRAY)
@@ -768,7 +768,7 @@ static func _make_district_building(parent: Node3D, x: float, z: float,
 			var b_mesh = BoxMesh.new()
 			b_mesh.size = Vector3(w, h, d)
 			mesh.mesh = b_mesh
-			mesh.position = Vector3(x, h / 2, z)
+			mesh.position = Vector3(x, terrain_height(x, z) + h / 2, z)
 			var mat = StandardMaterial3D.new()
 			var colors = ["#7c2d12", "#9a3412", "#451a03", "#57534e", "#78350f", "#5b2c0f"]
 			mat.albedo_color = Color.from_string(colors[int(rng.call(1) * 6) % 6], Color.DIM_GRAY)
@@ -779,7 +779,7 @@ static func _make_district_building(parent: Node3D, x: float, z: float,
 			var b_mesh = BoxMesh.new()
 			b_mesh.size = Vector3(w, h, d)
 			mesh.mesh = b_mesh
-			mesh.position = Vector3(x, h / 2, z)
+			mesh.position = Vector3(x, terrain_height(x, z) + h / 2, z)
 			var mat = StandardMaterial3D.new()
 			var colors = ["#3f3f46", "#525252", "#27272a", "#404040", "#52525b"]
 			mat.albedo_color = Color.from_string(colors[int(rng.call(1) * 5) % 5], Color.DIM_GRAY)
@@ -791,7 +791,7 @@ static func _make_district_building(parent: Node3D, x: float, z: float,
 			var b_mesh = BoxMesh.new()
 			b_mesh.size = Vector3(w, h, d)
 			mesh.mesh = b_mesh
-			mesh.position = Vector3(x, h / 2, z)
+			mesh.position = Vector3(x, terrain_height(x, z) + h / 2, z)
 			var mat = StandardMaterial3D.new()
 			var colors = ["#a3a3a3", "#d4d4d4", "#f5f5f5", "#e5e5e5", "#bfbfbf", "#d1d5db"]
 			mat.albedo_color = Color.from_string(colors[int(rng.call(1) * 6) % 6], Color.DIM_GRAY)
@@ -873,13 +873,13 @@ static func _build_street_lamps(parent: Node3D) -> void:
 		p_mesh.bottom_radius = 0.08
 		p_mesh.height = 4
 		pole.mesh = p_mesh
-		pole.position = pos + Vector3(0, 2, 0)
+		pole.position = pos + Vector3(0, terrain_height(pos.x, pos.z) + 2, 0)
 		var mat = StandardMaterial3D.new()
 		mat.albedo_color = Color(0.06, 0.06, 0.06)
 		pole.material_override = mat
 		parent.add_child(pole)
 		var light = OmniLight3D.new()
-		light.position = pos + Vector3(0, 4, 0)
+		light.position = pos + Vector3(0, terrain_height(pos.x, pos.z) + 4, 0)
 		light.light_color = Color(1, 0.95, 0.8)
 		light.light_energy = 2.0
 		light.omni_range = 12.0
@@ -1045,7 +1045,7 @@ static func _park(parent: Node3D, x: float, z: float, w: float, d: float) -> voi
 	var g_mesh = BoxMesh.new()
 	g_mesh.size = Vector3(w, 0.12, d)
 	grass.mesh = g_mesh
-	grass.position = Vector3(x, 0.06, z)
+	grass.position = Vector3(x, terrain_height(x, z) + 0.06, z)
 	var gmat = StandardMaterial3D.new()
 	gmat.albedo_color = Color(0.18, 0.35, 0.15)
 	gmat.roughness = 1.0
@@ -1053,7 +1053,7 @@ static func _park(parent: Node3D, x: float, z: float, w: float, d: float) -> voi
 	parent.add_child(grass)
 	# COLLISION: StaticBody3D so cars/player can walk on park grass
 	var grass_body = StaticBody3D.new()
-	grass_body.position = Vector3(x, 0.06, z)
+	grass_body.position = Vector3(x, terrain_height(x, z) + 0.06, z)
 	var grass_col = CollisionShape3D.new()
 	var grass_shape = BoxShape3D.new()
 	grass_shape.size = Vector3(w, 0.12, d)
