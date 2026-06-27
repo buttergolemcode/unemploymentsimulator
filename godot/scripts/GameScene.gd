@@ -60,7 +60,7 @@ func _spawn_vehicles():
 		vehicle.script = preload("res://scripts/Vehicle.gd")
 		vehicle.car_model = vdata.get("model", "NormalCar1")
 		vehicle.yaw = vdata.yaw
-		vehicle.position = Vector3(vdata.x, 0, vdata.z)
+		vehicle.position = Vector3(vdata.x, WorldBuilder.terrain_height(vdata.x, vdata.z), vdata.z)
 		
 		# Collision
 		var col = CollisionShape3D.new()
@@ -131,7 +131,7 @@ func _spawn_npc(x: float, z: float, color: String, district: String, is_merchant
 	# This lets vehicles drive through NPCs (handled in NPC.gd via distance check)
 	npc.collision_layer = 4  # layer 3
 	npc.collision_mask = 1  # only collide with ground layer
-	npc.position = Vector3(x, 0, z)
+	npc.position = Vector3(x, WorldBuilder.terrain_height(x, z), z)
 	
 	var col = CollisionShape3D.new()
 	var shape = CapsuleShape3D.new()

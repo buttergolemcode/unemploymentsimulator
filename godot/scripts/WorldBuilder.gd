@@ -1108,7 +1108,7 @@ static func _skyscraper(parent: Node3D, x: float, z: float, w: float, h: float, 
 	var s_mesh = BoxMesh.new()
 	s_mesh.size = Vector3(w, h, w)
 	mesh.mesh = s_mesh
-	mesh.position = Vector3(x, h / 2, z)
+	mesh.position = Vector3(x, terrain_height(x, z) + h / 2, z)
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = Color.from_string(color, Color.DIM_GRAY)
 	mat.metalness = 0.7
@@ -1119,7 +1119,7 @@ static func _skyscraper(parent: Node3D, x: float, z: float, w: float, h: float, 
 	mesh.material_override = mat
 	parent.add_child(mesh)
 	var body = StaticBody3D.new()
-	body.position = Vector3(x, h / 2, z)
+	body.position = Vector3(x, terrain_height(x, z) + h / 2, z)
 	var col = CollisionShape3D.new()
 	var shape = BoxShape3D.new()
 	shape.size = Vector3(w, h, w)
