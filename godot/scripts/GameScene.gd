@@ -91,31 +91,29 @@ func _spawn_vehicles():
 func _spawn_npcs():
 	# Merchants near scheme buildings (positions match new D.4 v2 layout)
 	var merchant_positions = [
-		# Downtown merchants (financial district, +100..+800 X)
-		{"x": 280, "z": -80, "color": "#16a34a", "district": "downtown"},
-		{"x": 480, "z": 80, "color": "#16a34a", "district": "downtown"},
-		{"x": 180, "z": 180, "color": "#16a34a", "district": "downtown"},
-		{"x": 580, "z": -180, "color": "#16a34a", "district": "downtown"},
-		# Slums merchants (container-slum, +50..+300 X, +300..+800 Z)
-		{"x": 90, "z": 480, "color": "#b91c1c", "district": "slums"},
-		{"x": 40, "z": 580, "color": "#b91c1c", "district": "slums"},
-		{"x": 140, "z": 530, "color": "#b91c1c", "district": "slums"},
-		# Industrial merchant (e-com, -600..+200 X)
-		{"x": -220, "z": -80, "color": "#d97706", "district": "industrial"},
-		# Harbor merchant (waterfront, +600..+1500 X)
-		{"x": 900, "z": 0, "color": "#7e22ce", "district": "harbor"},
+		# NYC Downtown merchants (center)
+		{"x": 30, "z": -80, "color": "#16a34a", "district": "nyc"},
+		{"x": 130, "z": 30, "color": "#16a34a", "district": "nyc"},
+		{"x": -80, "z": 80, "color": "#16a34a", "district": "nyc"},
+		{"x": 180, "z": -80, "color": "#16a34a", "district": "nyc"},
+		# Slums merchants (W/NW)
+		{"x": -380, "z": 180, "color": "#b91c1c", "district": "slums_suburbs"},
+		{"x": -480, "z": 280, "color": "#b91c1c", "district": "slums_suburbs"},
+		{"x": -330, "z": 330, "color": "#b91c1c", "district": "slums_suburbs"},
+		# NYC merchant (e-com warehouse)
+		{"x": -30, "z": 180, "color": "#d97706", "district": "nyc"},
+		# Harbor merchant (SE)
+		{"x": 400, "z": 300, "color": "#7e22ce", "district": "harbor"},
 	]
 	for mp in merchant_positions:
 		_spawn_npc(mp.x, mp.z, mp.color, mp.district, true)
 	
 	# Pedestrians — distributed per district (3x more NPCs for livelier city)
 	var ped_configs = [
-		{"district": "downtown", "count": 35, "colors": ["#1e293b", "#0f172a", "#374151", "#4b5563"]},
+		{"district": "nyc", "count": 35, "colors": ["#1e293b", "#0f172a", "#374151", "#4b5563"]},
 		{"district": "harbor", "count": 15, "colors": ["#1c1917", "#292524", "#44403c"]},
-		{"district": "slums", "count": 30, "colors": ["#7c2d12", "#9a3412", "#451a03", "#1c1917"]},
-		{"district": "industrial", "count": 18, "colors": ["#3f3f46", "#525252", "#27272a"]},
-		{"district": "suburbs", "count": 15, "colors": ["#525252", "#737373", "#404040"]},
-		{"district": "rural", "count": 8, "colors": ["#6b5b4a", "#7a6a5a"]},
+		{"district": "slums_suburbs", "count": 30, "colors": ["#7c2d12", "#9a3412", "#451a03", "#1c1917"]},
+		{"district": "portofino", "count": 15, "colors": ["#d4a574", "#e8c89a", "#c97b50"]},
 	]
 	for config in ped_configs:
 		for i in config.count:
@@ -157,14 +155,12 @@ func _spawn_npc_in_district(district: String, color: String):
 		return
 
 func _get_district_bounds(d: String) -> Array:
-	# Bounds match D.4.5a Kustenstadt layout (x_min, x_max, z_min, z_max)
 	match d:
-		"downtown": return [100, 800, -500, 500]
-		"harbor": return [600, 1500, -600, 600]
-		"slums": return [50, 300, 300, 800]
-		"industrial": return [-600, 200, -500, 500]
-		"suburbs": return [-1000, -400, -500, 500]
-		_: return [-1200, -800, -1200, 1200]  # rural
+		"portofino": return [-50, 800, -800, 100]
+		"nyc": return [-200, 300, -300, 400]
+		"harbor": return [100, 800, 100, 800]
+		"slums_suburbs": return [-800, -100, -800, 800]
+		_: return [-200, 300, -300, 400]
 
 func _process(delta):
 	elapsed_time += delta

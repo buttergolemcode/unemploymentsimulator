@@ -19,38 +19,28 @@ extends RefCounted
 # Slums: Container-slum south of Downtown/Industrial border
 # Mountains: Canyon walls (80-120m, steep) at North/South/West edges
 
-const MAP_SIZE: float = 3000.0          # playable area (-1500..+1500)
-const WATER_OFFSET: float = 1500.0      # water starts at x=+1500 (East coast)
-const WATER_PLANE_SIZE: float = 3000.0  # ocean size
+const MAP_SIZE: float = 2500.0          # playable area (-1250..+1250)
+const WATER_OFFSET: float = 1250.0      # sea starts beyond island edge
+const WATER_PLANE_SIZE: float = 4000.0  # ocean (larger than island)
 
-# Street grid — Downtown only (other districts have different layouts)
-const STREET_GRID: Array = [200, 300, 400, 500, 600, 700]
+# Street grid — NYC Downtown only
+const STREET_GRID: Array = [-200, -100, 0, 100, 200, 300]
 const ROAD_HALF_WIDTH: float = 4.0       # Main Avenue: 8m wide (2 lanes)
 const SIDEWALK_WIDTH: float = 2.5       # 2.5m sidewalk on each side
 const SIDEWALK_HEIGHT: float = 0.15     # raised sidewalk (15cm curb)
 const BLOCK_SIZE: float = 80.0          # 80m blocks in Downtown grid
 const BUILDING_MARGIN: float = 0.5      # buildings flush with sidewalk
 
-# Highway constants
-const HIGHWAY_HALF_WIDTH: float = 8.0   # 16m wide (4 lanes)
-const HIGHWAY_BARRIER: float = 0.5      # center barrier width
-
-# Canyon/Mountain constants
-const CANYON_HEIGHT: float = 100.0      # 100m tall canyon walls
-const CANYON_EDGE_NORTH: float = -1200.0  # canyon starts at z=-1200
-const CANYON_EDGE_SOUTH: float = 1200.0   # canyon starts at z=+1200
-const CANYON_EDGE_WEST: float = -1200.0   # canyon starts at x=-1200
-
-# Harbor constants
-const HARBOR_BASIN_X: float = 1200.0    # harbor basin center X
-const HARBOR_BASIN_W: float = 300.0     # basin width (E-W)
-const HARBOR_BASIN_D: float = 600.0     # basin depth (N-S)
+# Harbor constants (SE part of island)
+const HARBOR_BASIN_X: float = 400.0     # harbor basin center X (SE area)
+const HARBOR_BASIN_W: float = 200.0     # basin width
+const HARBOR_BASIN_D: float = 300.0     # basin depth
 
 # Heightmap (loaded from PNG, replaces procedural terrain_height)
 static var _heightmap_img: Image = null
 const HEIGHTMAP_PATH: String = "res://assets/heightmap.png"
 const HEIGHTMAP_SIZE: int = 1024
-const HEIGHTMAP_WORLD_SIZE: float = 3000.0
+const HEIGHTMAP_WORLD_SIZE: float = 2500.0
 const HEIGHTMAP_MAX_HEIGHT: float = 120.0
 
 static func _load_heightmap() -> void:
@@ -70,13 +60,35 @@ static func _init_districts() -> void:
 	if not DISTRICTS.is_empty():
 		return
 	DISTRICTS = {
-		"downtown": {
-			"color": "#475569", "height_min": 40, "height_max": 150, "ground": "#1a1a1a",
-			# Downtown: +100..+800 X, -500..+500 Z
+		"portofino": {
+			"color": "#d4a574", "height_min": 8, "height_max": 20, "ground": "#8a7a5a",
+			# Portofino: NE part of island (x > -50, z < 100)
 			"polygon": PackedVector2Array([
-				Vector2(100, -500), Vector2(800, -500), Vector2(800, 500), Vector2(100, 500)
+				Vector2(-50, -800), Vector2(800, -800), Vector2(800, 100), Vector2(-50, 100)
 			])
 		},
+		"nyc": {
+			"color": "#1e293b", "height_min": 40, "height_max": 150, "ground": "#1a1a1a",
+			# NYC Downtown: center of island (-200..+300 X, -300..+400 Z)
+			"polygon": PackedVector2Array([
+				Vector2(-200, -300), Vector2(300, -300), Vector2(300, 400), Vector2(-200, 400)
+			])
+		},
+		"harbor": {
+			"color": "#1c1917", "height_min": 8, "height_max": 20, "ground": "#171717",
+			# Harbor: SE part of island (x > 100, z > 100)
+			"polygon": PackedVector2Array([
+				Vector2(100, 100), Vector2(800, 100), Vector2(800, 800), Vector2(100, 800)
+			])
+		},
+		"slums_suburbs": {
+			"color": "#5a4030", "height_min": 4, "height_max": 12, "ground": "#2a2a1a",
+			# Slums/Suburbs: W/NW part of island (x < -100)
+			"polygon": PackedVector2Array([
+				Vector2(-800, -800), Vector2(-100, -800), Vector2(-100, 800), Vector2(-800, 800)
+			])
+		},
+	},
 		"harbor": {
 			"color": "#1c1917", "height_min": 10, "height_max": 25, "ground": "#171717",
 			# Harbor: +600..+1500 X, -600..+600 Z (overlaps downtown east edge for waterfront)
@@ -119,25 +131,25 @@ static func _init_districts() -> void:
 # ============================================================
 
 const SCHEME_BUILDINGS: Array = [
-	# Downtown (+100..+800 X) — tall skyscrapers (40-150m)
+	# NYC Downtown (center) — tall skyscrapers (40-150m)
 	{"id": "trading", "name": "Trading Floor", "emoji": "📈",
-	 "x": 300, "z": -100, "w": 25, "d": 22, "h": 70, "color": "#22d3ee"},
+	 "x": 50, "z": -50, "w": 25, "d": 22, "h": 70, "color": "#22d3ee"},
 	{"id": "wirefraud", "name": "Corporate Tower", "emoji": "💸",
-	 "x": 500, "z": 100, "w": 30, "d": 25, "h": 120, "color": "#64748b"},
+	 "x": 150, "z": 50, "w": 30, "d": 25, "h": 120, "color": "#64748b"},
 	{"id": "taxfraud", "name": "Accountant Office", "emoji": "🧾",
-	 "x": 200, "z": 200, "w": 18, "d": 16, "h": 35, "color": "#eab308"},
+	 "x": -100, "z": 100, "w": 18, "d": 16, "h": 35, "color": "#eab308"},
 	{"id": "gambling", "name": "Casino", "emoji": "🎰",
-	 "x": 600, "z": -200, "w": 25, "d": 22, "h": 28, "color": "#f59e0b"},
-	# Slums (+50..+300 X, +300..+800 Z) — container-slum buildings (4-8m)
+	 "x": 200, "z": -100, "w": 25, "d": 22, "h": 28, "color": "#f59e0b"},
+	# Slums (W/NW) — container-slum buildings (4-8m)
 	{"id": "drugs", "name": "Trap House", "emoji": "💊",
-	 "x": 100, "z": 500, "w": 10, "d": 8, "h": 6, "color": "#a855f7"},
+	 "x": -400, "z": 200, "w": 10, "d": 8, "h": 6, "color": "#a855f7"},
 	{"id": "scam", "name": "Internet Cafe", "emoji": "🎣",
-	 "x": 50, "z": 600, "w": 8, "d": 7, "h": 5, "color": "#ec4899"},
+	 "x": -500, "z": 300, "w": 8, "d": 7, "h": 5, "color": "#ec4899"},
 	{"id": "robbery", "name": "Corner Store", "emoji": "🔫",
-	 "x": 150, "z": 550, "w": 7, "d": 7, "h": 4, "color": "#ef4444"},
-	# Industrial (-600..+200 X) — large warehouse (15m)
+	 "x": -350, "z": 350, "w": 7, "d": 7, "h": 4, "color": "#ef4444"},
+	# NYC Downtown — large warehouse (15m)
 	{"id": "ecom", "name": "E-Com Warehouse", "emoji": "📦",
-	 "x": -200, "z": -100, "w": 25, "d": 22, "h": 15, "color": "#4ade80"},
+	 "x": -50, "z": 200, "w": 25, "d": 22, "h": 15, "color": "#4ade80"},
 ]
 
 # ============================================================
@@ -147,17 +159,13 @@ const SCHEME_BUILDINGS: Array = [
 static func get_district_at(x: float, z: float) -> String:
 	_init_districts()
 	var point = Vector2(x, z)
-	# Check all districts including rural (now has a polygon)
-	for district_name in ["downtown", "harbor", "slums", "industrial", "suburbs", "rural"]:
+	for district_name in ["portofino", "nyc", "harbor", "slums_suburbs"]:
 		var district = DISTRICTS[district_name]
 		var polygon = district.get("polygon", PackedVector2Array())
 		if polygon.size() >= 3 and Geometry2D.is_point_in_polygon(point, polygon):
 			return district_name
-	# Water (east of coast)
-	if x > WATER_OFFSET:
-		return "water"
-	# Canyon/mountains (beyond playable area)
-	return "canyon"
+	# Off-island = sea
+	return "sea"
 
 # ============================================================
 # Terrain height (flat city, hills at rural edge, water below)
@@ -304,38 +312,8 @@ static func _build_terrain(parent: Node3D) -> void:
 			terrain_body.add_child(rcol)
 	parent.add_child(terrain_body)
 	
-	# 3) Mountain walls (impassable barriers at map edges — extended for larger map)
-	# North wall (z < -600)
-	var north_body = StaticBody3D.new()
-	north_body.name = "MountainNorth"
-	var north_col = CollisionShape3D.new()
-	var north_shape = BoxShape3D.new()
-	north_shape.size = Vector3(3600, CANYON_HEIGHT, 300)
-	north_col.shape = north_shape
-	north_col.position = Vector3(0, CANYON_HEIGHT / 2, -1350)
-	north_body.add_child(north_col)
-	parent.add_child(north_body)
-	# South wall (z > 600)
-	var south_body = StaticBody3D.new()
-	south_body.name = "MountainSouth"
-	var south_col = CollisionShape3D.new()
-	var south_shape = BoxShape3D.new()
-	south_shape.size = Vector3(3600, CANYON_HEIGHT, 300)
-	south_col.shape = south_shape
-	south_col.position = Vector3(0, CANYON_HEIGHT / 2, 1350)
-	south_body.add_child(south_col)
-	parent.add_child(south_body)
-	# West wall (x < -600)
-	var west_body = StaticBody3D.new()
-	west_body.name = "MountainWest"
-	var west_col = CollisionShape3D.new()
-	var west_shape = BoxShape3D.new()
-	west_shape.size = Vector3(300, CANYON_HEIGHT, 3600)
-	west_col.shape = west_shape
-	west_col.position = Vector3(-1350, CANYON_HEIGHT / 2, 0)
-	west_body.add_child(west_col)
-	parent.add_child(west_body)
-	# East harbor wall (low barrier at harbor edge)
+	# Mountain walls removed — island uses sea as border
+
 	var east_body = StaticBody3D.new()
 	east_body.name = "HarborBarrier"
 	var east_col = CollisionShape3D.new()
@@ -384,7 +362,7 @@ static func _build_roads(parent: Node3D) -> void:
 	_build_crosswalks(parent)
 
 static func _make_street(parent: Node3D, axis: String, pos: float) -> void:
-	var length = 1200.0  # spans Downtown area (extended for larger map)
+	var length = 800.0  # spans NYC Downtown grid
 	# === ASPHALT (street surface, full length — runs through intersections) ===
 	var asphalt = MeshInstance3D.new()
 	var a_mesh = BoxMesh.new()
@@ -619,7 +597,7 @@ static func _build_filler_buildings(parent: Node3D) -> void:
 	# Block centers (between streets, at -250, -50, 50, 250)
 	# (because streets are at -300, -200, -100, 0, 100, 200, 300,
 	#  block centers are at -250, -150, -50, 50, 150, 250)
-	var block_centers = [250, 350, 450, 550, 650, 750]  # Downtown
+	var block_centers = [-150, -50, 50, 150, 250]  # NYC Downtown grid
 	
 	for bx in block_centers:
 		for bz in block_centers:
@@ -811,9 +789,9 @@ static func _is_on_road(x: float, z: float) -> bool:
 	# with sidewalk buffer
 	var road_buffer = ROAD_HALF_WIDTH + SIDEWALK_WIDTH
 	for pos in STREET_GRID:
-		if abs(z - pos) < road_buffer and abs(x) > 50 and abs(x) < 850:
+		if abs(z - pos) < road_buffer and abs(x) > -250 and abs(x) < 350:
 			return true
-		if abs(x - pos) < road_buffer and abs(z) > -600 and abs(z) < 600:
+		if abs(x - pos) < road_buffer and abs(z) > -350 and abs(z) < 450:
 			return true
 	return false
 
@@ -856,10 +834,10 @@ static func _make_tree(parent: Node3D, x: float, z: float, s: float):
 
 static func _build_street_lamps(parent: Node3D) -> void:
 	var positions = [
-		Vector3(250, 0, -50), Vector3(350, 0, -50), Vector3(450, 0, -50), Vector3(550, 0, -50),
-		Vector3(250, 0, 50), Vector3(350, 0, 50), Vector3(450, 0, 50), Vector3(550, 0, 50),
-		Vector3(650, 0, -50), Vector3(750, 0, -50), Vector3(650, 0, 50), Vector3(750, 0, 50),
-		Vector3(300, 0, -200), Vector3(500, 0, -200), Vector3(300, 0, 200), Vector3(500, 0, 200),
+		Vector3(-150, 0, -50), Vector3(-50, 0, -50), Vector3(50, 0, -50), Vector3(150, 0, -50),
+		Vector3(-150, 0, 50), Vector3(-50, 0, 50), Vector3(50, 0, 50), Vector3(150, 0, 50),
+		Vector3(250, 0, -50), Vector3(250, 0, 50),
+		Vector3(-100, 0, -150), Vector3(100, 0, -150), Vector3(-100, 0, 150), Vector3(100, 0, 150),
 	]
 	for pos in positions:
 		var pole = MeshInstance3D.new()
@@ -891,7 +869,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 	var b_mesh = BoxMesh.new()
 	b_mesh.size = Vector3(200, 0.1, 300)  # 200x300m harbor basin
 	basin.mesh = b_mesh
-	basin.position = Vector3(1350, -2.0, 0)  # harbor basin at new coast plane (y=-3.0) to avoid z-fight
+	basin.position = Vector3(400, -2.0, 300)  # harbor basin at new coast plane (y=-3.0) to avoid z-fight
 	var basin_mat = StandardMaterial3D.new()
 	basin_mat.albedo_color = Color(0.05, 0.15, 0.28)  # dark water
 	basin_mat.roughness = 0.1
@@ -907,7 +885,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		var p_mesh = BoxMesh.new()
 		p_mesh.size = Vector3(120, 1.0, 20)  # 120m long, 20m wide pier
 		pier.mesh = p_mesh
-		pier.position = Vector3(1350, 0.5, pier_z)
+		pier.position = Vector3(400, 0.5, pier_z)
 		var pier_mat = StandardMaterial3D.new()
 		pier_mat.albedo_color = Color(0.5, 0.5, 0.5)  # concrete gray
 		pier_mat.roughness = 0.95
@@ -915,7 +893,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		parent.add_child(pier)
 		# Collision for pier (so cars can drive on it)
 		var pier_body = StaticBody3D.new()
-		pier_body.position = Vector3(1350, 0.5, pier_z)
+		pier_body.position = Vector3(400, 0.5, pier_z)
 		var pier_col = CollisionShape3D.new()
 		var pier_shape = BoxShape3D.new()
 		pier_shape.size = Vector3(120, 1.0, 20)
@@ -930,7 +908,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		var s_mesh = BoxMesh.new()
 		s_mesh.size = Vector3(80, 8, 15)  # 80m long, 8m tall, 15m wide ship
 		ship.mesh = s_mesh
-		ship.position = Vector3(1390, 4, ship_z + 15)  # next to pier at new harbor
+		ship.position = Vector3(440, 4, ship_z + 15)  # next to pier at new harbor
 		var ship_mat = StandardMaterial3D.new()
 		var ship_colors = ["#1e3a5f", "#1e293b", "#0c4a6e", "#1e3a5f"]
 		ship_mat.albedo_color = Color.from_string(ship_colors[ship_idx % 4], Color(0.12, 0.23, 0.54))
@@ -943,7 +921,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		var br_mesh = BoxMesh.new()
 		br_mesh.size = Vector3(15, 6, 12)
 		bridge.mesh = br_mesh
-		bridge.position = Vector3(1390, 12, ship_z + 15)
+		bridge.position = Vector3(440, 12, ship_z + 15)
 		var bridge_mat = StandardMaterial3D.new()
 		bridge_mat.albedo_color = Color.WHITE
 		bridge_mat.roughness = 0.3
@@ -955,7 +933,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 		# Place containers ON the piers (at pier height y=1.5)
 		var pier_idx = i % 3
 		var pier_z = -100 + pier_idx * 100
-		var cx = 1310 + (i / 3) % 5 * 12  # along pier length
+		var cx = 360 + (i / 3) % 5 * 12  # along pier length
 		var cz = pier_z + ((i / 3) / 5) % 2 * 6 - 3  # across pier width
 		var container = MeshInstance3D.new()
 		var c_mesh = BoxMesh.new()
@@ -974,7 +952,7 @@ static func _build_dock_props(parent: Node3D) -> void:
 	for i in range(6):
 		var crane_idx = i % 3
 		var crane_z = -100 + crane_idx * 100
-		var crane_x = 1330 + (i / 3) * 30
+		var crane_x = 380 + (i / 3) * 30
 		var crane = _make_crane()
 		crane.position = Vector3(crane_x, 1.0, crane_z)  # on pier
 		parent.add_child(crane)
@@ -1016,22 +994,22 @@ static func _make_crane() -> Node3D:
 
 static func _build_landmarks(parent: Node3D) -> void:
 	# Central Park (Downtown, between skyscrapers)
-	_park(parent, 400, 300, 100, 60)
+	_park(parent, 0, 150, 80, 50)
 	# Skyline row (3 tall towers in Downtown East, near harbor)
-	_skyscraper(parent, 700, -100, 20, 110, "#1e293b")
-	_skyscraper(parent, 730, -100, 20, 140, "#0f172a")
-	_skyscraper(parent, 760, -100, 20, 120, "#1e293b")
+	_skyscraper(parent, 200, -100, 20, 110, "#1e293b")
+	_skyscraper(parent, 230, -100, 20, 140, "#0f172a")
+	_skyscraper(parent, 260, -100, 20, 120, "#1e293b")
 	# Bridge at harbor entrance
-	_bridge(parent, 1200, 0, 0)
+	_bridge(parent, 500, 200, 0)
 	# Fortress on west canyon rim
-	_fortress(parent, -1000, -800)
+	_fortress(parent, 500, -500)
 	# Stadium in Industrial area
-	_stadium(parent, -300, 200)
+	_stadium(parent, -300, -200)
 	# Bus station in Downtown
-	_bus_station(parent, 450, -250)
+	_bus_station(parent, 100, -200)
 	# Gas stations (Industrial + Harbor)
-	_gas_station(parent, -300, -200)
-	_gas_station(parent, 700, 300)
+	_gas_station(parent, -200, 100)
+	_gas_station(parent, 400, 350)
 
 static func _park(parent: Node3D, x: float, z: float, w: float, d: float) -> void:
 	# Park with clear boundary (sidewalk-style border) like a building block

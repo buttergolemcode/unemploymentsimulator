@@ -14,21 +14,20 @@ const CAR_MODELS: Dictionary = {
 }
 
 const VEHICLE_POSITIONS: Array = [
-	# Downtown (+100..+800) — main avenues
-	{"x": 250,  "z": 50,   "yaw": 0,    "model": "NormalCar1"},
-	{"x": 350,  "z": -50,  "yaw": 1.57, "model": "Taxi"},
-	{"x": 450,  "z": 100,  "yaw": 3.14, "model": "SportsCar"},
-	{"x": 550,  "z": -100, "yaw": 0,    "model": "NormalCar2"},
-	{"x": 650,  "z": 50,   "yaw": -1.57,"model": "SUV"},
-	# Harbor — near piers
-	{"x": 900,  "z": 0,    "yaw": 0,    "model": "NormalCar1"},
-	{"x": 1000, "z": 100,  "yaw": 1.57, "model": "SportsCar2"},
-	# Industrial — warehouse area
-	{"x": -200, "z": -100, "yaw": 0,    "model": "SUV"},
-	{"x": -400, "z": 50,   "yaw": 3.14, "model": "NormalCar2"},
-	# Suburbs — residential streets
-	{"x": -700, "z": -100, "yaw": 0,    "model": "NormalCar1"},
-	{"x": -800, "z": 200,  "yaw": 1.57, "model": "SportsCar"},
+	# NYC Downtown (center)
+	{"x": 0, "z": 50, "yaw": 0, "model": "NormalCar1"},
+	{"x": 100, "z": -50, "yaw": 1.57, "model": "Taxi"},
+	{"x": -50, "z": 100, "yaw": 3.14, "model": "SportsCar"},
+	{"x": 150, "z": 0, "yaw": -1.57, "model": "NormalCar2"},
+	# Harbor (SE)
+	{"x": 350, "z": 250, "yaw": 0, "model": "SUV"},
+	{"x": 450, "z": 350, "yaw": 1.57, "model": "SportsCar2"},
+	# Slums/Suburbs (W/NW)
+	{"x": -300, "z": 0, "yaw": 0, "model": "NormalCar1"},
+	{"x": -400, "z": -200, "yaw": 1.57, "model": "SUV"},
+	# Portofino (NE)
+	{"x": 300, "z": -300, "yaw": 0, "model": "SportsCar"},
+	{"x": 200, "z": -400, "yaw": -1.57, "model": "NormalCar2"},
 ]
 
 static func get_positions() -> Array:
