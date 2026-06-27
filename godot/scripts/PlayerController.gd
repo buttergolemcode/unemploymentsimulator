@@ -42,7 +42,14 @@ func _unhandled_input(event):
 		match event.keycode:
 			KEY_F1:
 				debug_noclip = not debug_noclip
-				motion_mode = CharacterBody3D.MOTION_MODE_FLOATING if debug_noclip else CharacterBody3D.MOTION_MODE_GROUNDED
+				if debug_noclip:
+					motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
+					collision_layer = 0  # disable collision entirely
+					collision_mask = 0
+				else:
+					motion_mode = CharacterBody3D.MOTION_MODE_GROUNDED
+					collision_layer = 2  # restore player layer
+					collision_mask = 1  # restore ground mask
 				print("[DEBUG] Noclip: ", debug_noclip)
 			KEY_F2:
 				debug_fast = not debug_fast
@@ -136,19 +143,20 @@ func _physics_process(delta):
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 		input_right += 1.0
 	
-	# === DEBUG NOCLIP MODE ===
+	# === DEBUG NOCLIP MODE — true noclip (no collision, direct position set) ===
 	if debug_noclip:
 		var forward3 = Vector3(-sin(yaw), -sin(pitch), -cos(yaw)).normalized()
 		var right3 = Vector3(cos(yaw), 0, -sin(yaw))
 		var wish = (forward3 * input_forward + right3 * input_right).normalized()
 		var fly_speed = DEBUG_NOCLIP_FAST_SPEED if (debug_fast or Input.is_key_pressed(KEY_SHIFT)) else DEBUG_NOCLIP_SPEED
-		velocity = wish * fly_speed
+		# Direct position update — no collision check, true noclip
+		var move_vec = wish * fly_speed * delta
 		# Space = up, Ctrl = down
 		if Input.is_key_pressed(KEY_SPACE):
-			velocity.y = fly_speed
+			move_vec.y = fly_speed * delta
 		elif Input.is_key_pressed(KEY_CTRL):
-			velocity.y = -fly_speed
-		move_and_slide()
+			move_vec.y = -fly_speed * delta
+		global_position += move_vec
 	else:
 		var forward = Vector3(-sin(yaw), 0, -cos(yaw))
 		var right = Vector3(cos(yaw), 0, -sin(yaw))
