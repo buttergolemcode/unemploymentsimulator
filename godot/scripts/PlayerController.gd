@@ -55,6 +55,32 @@ func _unhandled_input(event):
 			KEY_F4:
 				# Print current position (useful for debugging)
 				print("[DEBUG] Position: ", global_position, " District: ", WorldBuilder.get_district_at(global_position.x, global_position.z))
+			KEY_F5:
+				# Set time to noon (12:00)
+				var gs = get_tree().get_first_node_in_group("game_scene")
+				if gs and gs.has_meta("elapsed_time"):
+					gs.set_meta("elapsed_time", 360.0)
+				elif gs:
+					gs.elapsed_time = 360.0
+				print("[DEBUG] Time set to NOON (12:00)")
+			KEY_F6:
+				# Set time to midnight (00:00)
+				var gs2 = get_tree().get_first_node_in_group("game_scene")
+				if gs2:
+					gs2.elapsed_time = 0.0
+				print("[DEBUG] Time set to MIDNIGHT (00:00)")
+			KEY_F7:
+				# Set time to dawn (06:00)
+				var gs3 = get_tree().get_first_node_in_group("game_scene")
+				if gs3:
+					gs3.elapsed_time = 180.0
+				print("[DEBUG] Time set to DAWN (06:00)")
+			KEY_F8:
+				# Set time to dusk (18:00)
+				var gs4 = get_tree().get_first_node_in_group("game_scene")
+				if gs4:
+					gs4.elapsed_time = 540.0
+				print("[DEBUG] Time set to DUSK (18:00)")
 	
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if in_vehicle:

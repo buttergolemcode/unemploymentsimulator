@@ -13,6 +13,7 @@ var nearby_building_id: String = ""
 var nearby_building_node: Node3D = null
 
 func _ready():
+	add_to_group("game_scene")
 	# Environment
 	var env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
