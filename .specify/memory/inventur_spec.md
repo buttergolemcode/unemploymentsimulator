@@ -120,6 +120,10 @@
 | 012 | meta-system | Meta-Based Tagging | scheme_id/name/emoji via set_meta() | 2026-06-27 | ✅ |
 | 012 | meta-system | Collision Layer Separation | NPCs layer 3 mask 1, vehicles pass through | 2026-06-27 | ✅ |
 | 012 | meta-system | Static Data Registries | SchemeData, EventData, VehicleData, WorldBuilder (class_name) | 2026-06-27 | ✅ |
+| 013 | debug-mode | Noclip (F1) | FLOATING motion_mode, 3D flight, Space/Ctrl up/down | 2026-06-27 | ✅ |
+| 013 | debug-mode | Fast Speed (F2) | 4× walk/sprint speed, boosts noclip to 80 m/s | 2026-06-27 | ✅ |
+| 013 | debug-mode | Teleport to Ground (F3) | Reads terrain_height(), places player 2m above | 2026-06-27 | ✅ |
+| 013 | debug-mode | Print Position (F4) | Logs position + district to console | 2026-06-27 | ✅ |
 | — | D.4-map-layout | NYC Grid Redesign | 1200×1200m, 7 avenues, 100m blocks | 2026-06-27 | ✅ |
 | — | D.4-map-layout | Sidewalk Collision | 5cm collision, floor_snap kompatibel | 2026-06-27 | ✅ |
 | — | D.4-map-layout | Real Harbor | Basin, Piers, Ships, Container, Cranes | 2026-06-27 | ✅ |
